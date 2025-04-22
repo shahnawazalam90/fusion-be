@@ -11,8 +11,25 @@ module.exports = (fileController) => {
   router.get('/', fileController.listFiles);
   router.delete('/:id', fileController.deleteFile);
 
-  router.post('/parseSpec', upload.single('file'), async (req, res, next) => {
+  router.post('/parseSpec', (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({
+          status: 'error',
+          message: err.message || 'File upload error',
+        });
+      }
+      next();
+    });
+  }, async (req, res, next) => {
     try {
+      if (!req.file) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'No file uploaded',
+        });
+      }
+
       const filePath = req.file.path;
       const steps = parseSpecSteps(filePath);
       res.status(200).json({
