@@ -7,12 +7,15 @@ const logger = require('./utils/logger');
 
 // Repositories
 const UserRepository = require('./repositories/UserRepository');
+const FileRepository = require('./repositories/FileRepository');
 
 // Services
 const AuthService = require('./services/AuthService');
+const FileService = require('./services/FileService');
 
 // Controllers
 const AuthController = require('./api/v1/controllers/authController');
+const FileController = require('./api/v1/controllers/FileController');
 
 // Create Express app
 const createApp = async (models) => {
@@ -36,18 +39,22 @@ const createApp = async (models) => {
 
   // Initialize repositories
   const userRepository = new UserRepository(models);
+  const fileRepository = new FileRepository(models);
 
   // Initialize services
   const authService = new AuthService(userRepository);
+  const fileService = new FileService(fileRepository);
 
   // Initialize controllers
   const authController = new AuthController(authService);
+  const fileController = new FileController(fileService);
 
   // API routes
   app.use(
     '/api/v1/auth',
     require('./api/v1/routes/authRoutes')(authController)
   );
+  app.use('/api/v1/files', require('./api/v1/routes/fileRoutes')(fileController));
 
   // Root route
   app.get('/', (req, res) => {
