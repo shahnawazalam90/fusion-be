@@ -4,66 +4,101 @@ function parseSpecSteps(filePath) {
   // Read the file content
   const fileContent = fs.readFileSync(filePath, 'utf-8');
 
-  // Escape the file content
-  const escapedContent = fileContent.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-
-  // Regex patterns
-  const screenRegex = /\/\/\s*(.*?)\s*screen/g;
-  const urlRegex = /await\s+page\.goto\(['"]([^'"]+)['"]\)/;
-  const actionRegex = /await\s+page\.getByRole\(([^)]+)\)\.(\w+)\(([^)]*)\)/g;
-
-  let match;
-  const steps = [];
+  const screens = [];
+  const lines = fileContent.split('\n');
   let currentScreen = null;
 
-  // Parse the file content
-  while ((match = screenRegex.exec(fileContent)) !== null) {
-    if (currentScreen) steps.push(currentScreen);
-    currentScreen = {
-      screenName: match[1],
-      scenario: "happy path",
-      url: "",
-      actions: []
-    };
-  }
-  if (currentScreen) steps.push(currentScreen);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
 
-  // Extract URLs and actions
-  steps.forEach(screen => {
-    const screenStartIndex = fileContent.indexOf(`// ${screen.screenName} screen`);
-    const screenEndIndex = steps.indexOf(screen) < steps.length - 1
-      ? fileContent.indexOf(`// ${steps[steps.indexOf(screen) + 1].screenName} screen`)
-      : fileContent.length;
+    // Detect screen start based on comments
+    if (line.startsWith('//')) {
+      if (currentScreen) {
+        screens.push(currentScreen);
+      }
+      currentScreen = {
+        screenName: line.replace('//', '').trim(),
+        scenario: '',
+        url: '',
+        actions: []
+      };
+    } else if (line.startsWith('await page.goto')) {
+      const urlMatch = line.match(/await page\.goto\('(.*?)'\)/);
+      if (urlMatch && currentScreen) {
+        const url = urlMatch[1];
+        if (!currentScreen.url) {
+          currentScreen.url = url;
+        }
+        if (currentScreen.actions.length !== 0) {
+          currentScreen.actions.push({
+            action: 'goto',
+            locator: 'URL',
+            value: url
+          });
+        }
+      }
+    } else if (line.startsWith('await page.')) {
+      const actionMatch = line.match(/await page\.(\w+)\((.*?)\)/);
+      if (actionMatch && currentScreen) {
+        const [, method] = actionMatch;
+        let locator = '';
+        let value = '';
+        let action = method; // Default action is the method name
 
-    const screenContent = fileContent.slice(screenStartIndex, screenEndIndex);
-
-    // Extract URL
-    const urlMatch = urlRegex.exec(screenContent);
-    if (urlMatch) screen.url = urlMatch[1];
-
-    // Extract actions
-    let actionMatch;
-    while ((actionMatch = actionRegex.exec(screenContent)) !== null) {
-      const [_, role, action, params] = actionMatch;
-      if (action === 'click' || action === 'fill') {
-        const locatorMatch = /{[^}]*name:\s*['"]([^'"]+)['"]/g.exec(role);
-        const locator = locatorMatch ? `//${role.split(',')[0].trim()}[@name='${locatorMatch[1]}']` : '';
-        // const value = action === 'fill' ? params.replace(/['"]/g, '') : '';
-        const value = '';
-
-        if (action === 'fill' && screen.actions.length > 0) {
-          const lastAction = screen.actions[screen.actions.length - 1];
-          if (lastAction.action === 'click' && lastAction.locator === locator) {
-            screen.actions.pop();
-          }
+        // Handle getByRole
+        const roleMatch = line.match(/getByRole\('(.*?)',\s*{.*?name:\s*'(.*?)'.*?}\)/);
+        if (roleMatch) {
+          locator = `//[Role='${roleMatch[1]}'][@name='${roleMatch[2]}']`;
         }
 
-        screen.actions.push({ action, locator, value });
+        // Handle getByText
+        const textMatch = line.match(/getByText\('(.*?)'\)/);
+        if (textMatch) {
+          locator = `//[Text='${textMatch[1]}']`;
+        }
+
+        // Handle locator
+        const locatorMatch = line.match(/locator\('(.*?)'\)/);
+        if (locatorMatch) {
+          locator = locatorMatch[1];
+        }
+
+        // Handle getByLabel
+        const labelMatch = line.match(/getByLabel\('(.*?)'\)/);
+        if (labelMatch) {
+          locator = `//[Label='${labelMatch[1]}']`;
+        }
+
+        if (line.includes('fill')) {
+          action = 'fill';
+          value = line.match(/fill\('(.*?)'\)/)[1];
+        } else if (line.includes('selectOption')) {
+          action = 'selectOption';
+          value = line.match(/selectOption\('(.*?)'\)/)[1];
+        } else if (line.includes('click')) {
+          action = 'click';
+        }
+
+        locator = locator.replace(/['"`]/g, '').trim();
+        const lastAction = currentScreen.actions[currentScreen.actions.length - 1];
+        if (lastAction?.action === 'click' && lastAction?.locator === locator) {
+          currentScreen.actions.pop();
+        }
+
+        currentScreen.actions.push({
+          action,
+          locator,
+          value: value.trim()
+        });
       }
     }
-  });
+  }
 
-  return steps;
+  if (currentScreen) {
+    screens.push(currentScreen);
+  }
+
+  return screens;
 }
 
 module.exports = {
