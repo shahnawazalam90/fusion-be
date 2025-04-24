@@ -48,7 +48,16 @@ function parseSpecSteps(filePath) {
       if (action === 'click' || action === 'fill') {
         const locatorMatch = /{[^}]*name:\s*['"]([^'"]+)['"]/g.exec(role);
         const locator = locatorMatch ? `//${role.split(',')[0].trim()}[@name='${locatorMatch[1]}']` : '';
-        const value = action === 'fill' ? params.replace(/['"]/g, '') : '';
+        // const value = action === 'fill' ? params.replace(/['"]/g, '') : '';
+        const value = '';
+
+        if (action === 'fill' && screen.actions.length > 0) {
+          const lastAction = screen.actions[screen.actions.length - 1];
+          if (lastAction.action === 'click' && lastAction.locator === locator) {
+            screen.actions.pop();
+          }
+        }
+
         screen.actions.push({ action, locator, value });
       }
     }
