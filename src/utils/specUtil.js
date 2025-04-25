@@ -88,7 +88,7 @@ function parseSpecSteps(filePath) {
         currentScreen.actions.push({
           action,
           locator,
-          value: value.trim()
+          value: '' // value.trim()
         });
       }
     }
