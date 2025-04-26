@@ -9,16 +9,19 @@ const logger = require('./utils/logger');
 const UserRepository = require('./repositories/UserRepository');
 const FileRepository = require('./repositories/FileRepository');
 const ScenarioRepository = require('./repositories/ScenarioRepository');
+const ReportRepository = require('./repositories/ReportRepository');
 
 // Services
 const AuthService = require('./services/AuthService');
 const FileService = require('./services/FileService');
 const ScenarioService = require('./services/ScenarioService');
+const ReportService = require('./services/ReportService');
 
 // Controllers
 const AuthController = require('./api/v1/controllers/authController');
 const FileController = require('./api/v1/controllers/FileController');
 const ScenarioController = require('./api/v1/controllers/ScenarioController');
+const ReportController = require('./api/v1/controllers/ReportController');
 
 // Create Express app
 const createApp = async (models) => {
@@ -44,21 +47,25 @@ const createApp = async (models) => {
   const userRepository = new UserRepository(models);
   const fileRepository = new FileRepository(models);
   const scenarioRepository = new ScenarioRepository(models);
+  const reportRepository = new ReportRepository(models);
 
   // Initialize services
   const authService = new AuthService(userRepository);
   const fileService = new FileService(fileRepository);
   const scenarioService = new ScenarioService(scenarioRepository);
+  const reportService = new ReportService(reportRepository);
 
   // Initialize controllers
   const authController = new AuthController(authService);
   const fileController = new FileController(fileService);
   const scenarioController = new ScenarioController(scenarioService);
+  const reportController = new ReportController(reportService);
 
   // API routes
   app.use('/api/v1/auth', require('./api/v1/routes/authRoutes')(authController));
   app.use('/api/v1/files', require('./api/v1/routes/fileRoutes')(fileController));
   app.use('/api/v1/scenarios', require('./api/v1/routes/scenarioRoutes')(scenarioController));
+  app.use('/api/v1/reports', require('./api/v1/routes/reportRoutes')(reportController));
 
   // Root route
   app.get('/', (req, res) => {

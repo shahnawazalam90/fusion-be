@@ -24,8 +24,8 @@ services:
       - '5432:5432'
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: auth_app
+      POSTGRES_PASSWORD: toor
+      POSTGRES_DB: oracle_fusion
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
