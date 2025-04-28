@@ -10,6 +10,10 @@ class ReportRepository {
   async findAllByUserId(userId) {
     return this.Report.findAll({ where: { userId } });
   }
+
+  async findById(reportId) {
+    return this.Report.findByPk(reportId);
+  }
 }
 
 module.exports = ReportRepository;

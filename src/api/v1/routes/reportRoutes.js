@@ -1,18 +1,11 @@
 const express = require('express');
-const multer = require('multer');
 const { authenticateUser } = require('../../../middlewares/auth');
 const router = express.Router();
 
-const upload = multer({ dest: 'uploads/reports/' });
-
 module.exports = (reportController) => {
-  router.post(
-    '/',
-    authenticateUser,
-    upload.single('file'),
-    reportController.uploadReport
-  );
+  router.post('/', authenticateUser, reportController.uploadReport);
   router.get('/', authenticateUser, reportController.listReports);
+  router.post('/view', authenticateUser, reportController.viewReport);
 
   return router;
 };

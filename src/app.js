@@ -32,6 +32,9 @@ const createApp = async (models) => {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
+  // Serve static files
+  app.use('/public', express.static('uploads/reports'));
+
   // Logging middleware
   if (config.nodeEnv === 'development') {
     app.use(morgan('dev'));

@@ -1,4 +1,6 @@
 const { catchAsync } = require('../../../utils/catchAsync');
+const fs = require('fs');
+const { parseSpecSteps } = require('../../../utils/specUtil');
 
 class FileController {
   constructor(fileService) {
@@ -42,6 +44,28 @@ class FileController {
     await this.fileService.deleteFile(req.params.id);
 
     res.status(204).send();
+  });
+
+  parseSpec = catchAsync(async (req, res, next) => {
+    if (!req.file) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'No file uploaded',
+      });
+    }
+
+    const filePath = req.file.path;
+
+    try {
+      const steps = parseSpecSteps(filePath);
+      res.status(200).json({
+        status: 'success',
+        data: steps,
+      });
+    } finally {
+      // Delete the uploaded file
+      fs.unlinkSync(filePath);
+    }
   });
 }
 
