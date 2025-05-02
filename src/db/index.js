@@ -7,6 +7,7 @@ const UserModel = require('../models/User');
 const FileModel = require('../models/File');
 const ScenarioModel = require('../models/Scenario');
 const ReportModel = require('../models/Report');
+const SpecFileModel = require('../models/SpecFile');
 
 // Create Sequelize instance
 const sequelize = new Sequelize({
@@ -25,6 +26,7 @@ const models = {
   File: FileModel(sequelize),
   Scenario: ScenarioModel(sequelize),
   Report: ReportModel(sequelize),
+  SpecFile: SpecFileModel(sequelize),
 };
 
 // DB connection
