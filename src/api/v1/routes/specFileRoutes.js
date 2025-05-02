@@ -26,6 +26,9 @@ module.exports = (controller) => {
     controller.uploadSpecFile
   );
 
+  // Get the latest spec file
+  router.get('/latest', controller.getLatestSpecFile);
+
   // Get all spec files
   router.get('/', controller.getAllSpecFiles);
 

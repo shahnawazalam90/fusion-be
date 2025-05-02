@@ -64,6 +64,27 @@ class SpecFileController {
       next(error);
     }
   };
+  
+  getLatestSpecFile = async (req, res, next) => {
+    try {
+      const specFile = await this.specFileService.getLatestSpecFile();
+      
+      return res.status(200).json({
+        status: 'success',
+        data: {
+          specFile,
+        },
+      });
+    } catch (error) {
+      if (error.message === 'No spec files found in database') {
+        return res.status(404).json({
+          status: 'error',
+          message: error.message,
+        });
+      }
+      next(error);
+    }
+  };
 }
 
 module.exports = SpecFileController; 

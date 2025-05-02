@@ -32,6 +32,14 @@ class SpecFileService {
   async getSpecFileById(id) {
     return await this.specFileRepository.findById(id);
   }
+  
+  async getLatestSpecFile() {
+    const specFile = await this.specFileRepository.findLatest();
+    if (!specFile) {
+      throw new Error('No spec files found in database');
+    }
+    return specFile;
+  }
 }
 
 module.exports = SpecFileService; 

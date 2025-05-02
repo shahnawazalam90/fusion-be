@@ -4,36 +4,69 @@ function parseAction(step) {
   // Remove 'await page.' and trailing semicolon
   let raw = step.replace(/^await page\./, '').replace(/;$/, '').trim();
 
-  // Match the main method and its arguments
-  const methodMatch = raw.match(/^([a-zA-Z0-9_.]+)\((.*)\)(?:\.(\w+)\((.*)\))?/);
-  if (!methodMatch) return null;
+  // Extract action and value directly from the raw string
+  let action = null;
+  let value = null;
 
-  const [_, methodCall, methodArgs, action, actionArgs] = methodMatch;
+  if (raw.includes('.fill(')) {
+    action = 'fill';
+    const fillMatch = raw.match(/\.fill\('([^']*)'\)/);
+    if (fillMatch) {
+      value = fillMatch[1];
+    }
+  } else if (raw.includes('.selectOption(')) {
+    action = 'selectOption';
+    const selectMatch = raw.match(/\.selectOption\('([^']*)'\)/);
+    if (selectMatch) {
+      value = selectMatch[1];
+    }
+  } else if (raw.includes('.press(')) {
+    action = 'press';
+    const pressMatch = raw.match(/\.press\('([^']*)'\)/);
+    if (pressMatch) {
+      value = pressMatch[1];
+    }
+  } else if (raw.includes('.click(')) {
+    action = 'click';
+  }
 
-  // Parse method and selector
-  let method = methodCall;
+  // Extract method, selector and options
+  let method = null;
   let selector = null;
   let options = null;
 
-  // Try to extract selector and options
-  const argsMatch = methodArgs.match(/^'([^']+)'(?:,\s*(\{.*\}))?/);
-  if (argsMatch) {
-    selector = argsMatch[1];
-    if (argsMatch[2]) {
-      try {
-        // Convert single quotes to double for JSON parsing
-        options = JSON.parse(argsMatch[2].replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":').replace(/'/g, '"'));
-      } catch (e) {
-        options = argsMatch[2];
+  if (raw.includes('getByRole')) {
+    method = 'getByRole';
+    const roleMatch = raw.match(/getByRole\('([^']+)'(?:,\s*({[^}]+}))?\)/);
+    if (roleMatch) {
+      selector = roleMatch[1];
+      if (roleMatch[2]) {
+        try {
+          // Convert single quotes to double for JSON parsing
+          options = JSON.parse(roleMatch[2].replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":').replace(/'/g, '"'));
+        } catch (e) {
+          options = roleMatch[2];
+        }
       }
     }
-  }
-
-  // Parse action and value
-  let value = null;
-  if (action && actionArgs) {
-    // Remove surrounding quotes if present
-    value = actionArgs.replace(/^'(.*)'$/, '$1');
+  } else if (raw.includes('getByLabel')) {
+    method = 'getByLabel';
+    const labelMatch = raw.match(/getByLabel\('([^']+)'\)/);
+    if (labelMatch) {
+      selector = labelMatch[1];
+    }
+  } else if (raw.includes('getByText')) {
+    method = 'getByText';
+    const textMatch = raw.match(/getByText\('([^']+)'\)/);
+    if (textMatch) {
+      selector = textMatch[1];
+    }
+  } else if (raw.includes('getByTitle')) {
+    method = 'getByTitle';
+    const titleMatch = raw.match(/getByTitle\('([^']+)'\)/);
+    if (titleMatch) {
+      selector = titleMatch[1];
+    }
   }
 
   return {
@@ -41,7 +74,8 @@ function parseAction(step) {
     selector,
     options,
     action,
-    value,
+    parsedValue: value,
+    value: '',
     raw
   };
 }
@@ -77,7 +111,8 @@ function convertPlaywrightToJson(scenario, steps) {
     if (
       (step.includes('.click(') || step.includes('.press(')) &&
       step.includes('getByRole') &&
-      step.match(/getByRole\(\s*'textbox'/)
+      step.match(/getByRole\(\s*'textbox'/) &&
+      !step.includes('.fill(')
     ) {
       return;
     }

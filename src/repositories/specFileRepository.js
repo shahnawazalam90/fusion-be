@@ -14,6 +14,12 @@ class SpecFileRepository {
   async findAll() {
     return await this.specFileModel.findAll();
   }
+
+  async findLatest() {
+    return await this.specFileModel.findOne({
+      order: [['uploadedAt', 'DESC']]
+    });
+  }
 }
 
 module.exports = SpecFileRepository; 
