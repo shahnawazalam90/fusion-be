@@ -11,13 +11,22 @@ module.exports = (sequelize) => {
       type: DataTypes.UUID,
       allowNull: false,
     },
-    scenarioId: {
-      type: DataTypes.UUID,
+    scenarioIds: {
+      type: DataTypes.ARRAY(DataTypes.UUID),
       allowNull: false,
     },
     filePath: {
       type: DataTypes.STRING,
+      allowNull: true,
+    },
+    status: {
+      type: DataTypes.ENUM('pending', 'running', 'completed'),
       allowNull: false,
+      defaultValue: 'pending',
+    },
+    executedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
     createdAt: {
       type: DataTypes.DATE,
