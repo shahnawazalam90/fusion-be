@@ -9,11 +9,50 @@ class ReportService {
   }
 
   async createReport(reportData) {
+    // Ensure scenarioIds is always an array
+    if (reportData.scenarioId && !reportData.scenarioIds) {
+      reportData.scenarioIds = Array.isArray(reportData.scenarioId) 
+        ? reportData.scenarioId 
+        : [reportData.scenarioId];
+      delete reportData.scenarioId;
+    }
+    
+    // Set default status if not provided
+    if (!reportData.status) {
+      reportData.status = 'pending';
+    }
+    
     return this.reportRepository.create(reportData);
   }
 
-  async listReportsByUserId(userId) {
+  async listReportsByUserId(userId, status = null) {
+    if (status) {
+      const reports = await this.reportRepository.findAllByUserId(userId);
+      return reports.filter(report => report.status === status);
+    }
     return this.reportRepository.findAllByUserId(userId);
+  }
+
+  async listReportsByScenarioId(scenarioId) {
+    return this.reportRepository.findByScenarioId(scenarioId);
+  }
+
+  async listReportsByStatus(status) {
+    return this.reportRepository.findByStatus(status);
+  }
+
+  async updateReportStatus(reportId, status, executedAt = null) {
+    if (status === 'completed' && !executedAt) {
+      executedAt = new Date();
+    }
+    
+    await this.reportRepository.updateStatus(reportId, status, executedAt);
+    return this.reportRepository.findById(reportId);
+  }
+
+  async updateReportFilePath(reportId, filePath) {
+    await this.reportRepository.updateFilePath(reportId, filePath);
+    return this.reportRepository.findById(reportId);
   }
 
   async extractReport(userId, reportId) {
@@ -25,6 +64,10 @@ class ReportService {
 
     if (report.userId !== userId) {
       throw new UnauthorizedError('You are not authorized to access this report');
+    }
+
+    if (!report.filePath) {
+      throw new NotFoundError('Report file not generated yet');
     }
 
     const zipFilePath = report.filePath;
