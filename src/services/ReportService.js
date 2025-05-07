@@ -12,6 +12,7 @@ class ReportService {
     this.scenarioRepository = scenarioRepository;
   }
 
+  
   async createReport(reportData) {
     // Ensure scenarioIds is always an array
     if (reportData.scenarioId && !reportData.scenarioIds) {
@@ -137,8 +138,34 @@ class ReportService {
   }
 
   async listReportsByUserId(userId, status = null) {
+    let reports;
     if (status) {
-      const reports = await this.reportRepository.findAllByUserId(userId);
+      reports = await this.reportRepository.findAllByUserId(userId);
+      reports = reports.filter(report => report.status === status);
+    } else {
+      reports = await this.reportRepository.findAllByUserId(userId);
+    }
+
+    // Check pending reports for folder existence
+    const pendingReports = reports.filter(report => report.status === 'pending');
+    for (const report of pendingReports) {
+      if (report.scenarioFile) {
+        // Get the basename without extension
+        const folderName = path.basename(report.scenarioFile, path.extname(report.scenarioFile));
+        const reportFolderPath = path.join('uploads', 'reports', folderName);
+
+        // Check if folder exists
+        if (fs.existsSync(reportFolderPath)) {
+          // Update report status and filepath with just the folder name
+          await this.updateReportStatus(report.id, 'completed');
+          await this.updateReportFilePath(report.id, folderName);
+        }
+      }
+    }
+
+    // Get updated reports
+    if (status) {
+      reports = await this.reportRepository.findAllByUserId(userId);
       return reports.filter(report => report.status === status);
     }
     return this.reportRepository.findAllByUserId(userId);
@@ -162,7 +189,8 @@ class ReportService {
   }
 
   async updateReportFilePath(reportId, filePath) {
-    await this.reportRepository.updateFilePath(reportId, filePath);
+    const newPath = `/public/${filePath}/index.html`;
+    await this.reportRepository.updateFilePath(reportId, newPath);
     return this.reportRepository.findById(reportId);
   }
 

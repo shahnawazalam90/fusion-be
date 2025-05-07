@@ -190,8 +190,10 @@ class ReportController {
       });
     }
 
-    const extractDir = report.filePath.replace('.zip', '');
-    if (!fs.existsSync(extractDir)) {
+    const reportFolderPath = path.join('uploads', 'reports', report.filePath);
+    console.log(reportFolderPath, '===========>>>>>EXTRACT DIR+')
+    console.log(report.filePath, '===========>>>>>REPORT FILE PATH+')
+    if (!fs.existsSync(reportFolderPath)) {
       return res.status(404).json({
         status: 'error',
         message: 'Extracted files not found',
@@ -199,7 +201,7 @@ class ReportController {
     }
 
     // Generate public routes for the extracted files
-    const publicUrls = generatePublicRoutes(extractDir);
+    const publicUrls = generatePublicRoutes(reportFolderPath);
 
     res.status(200).json({
       status: 'success',

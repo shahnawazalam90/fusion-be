@@ -33,4 +33,17 @@ function generatePublicRoutes(directory) {
   return files;
 }
 
-module.exports = { extractZipFile, generatePublicRoutes };
+/**
+   * Trims a file path to get just the filename without extension
+   * @param {string} filePath - The full file path
+   * @returns {string} The filename without extension
+   * @example
+   * trimFilePath('uploads/scenarios/scenario-metadata-123.json')
+   * // returns 'scenario-metadata-123'
+   */
+function trimFilePath(filePath) {
+  const fileName = path.basename(filePath);
+  return fileName.replace(/\.[^/.]+$/, ''); // Remove file extension
+}
+
+module.exports = { extractZipFile, generatePublicRoutes, trimFilePath };
