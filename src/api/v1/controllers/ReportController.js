@@ -40,6 +40,15 @@ class ReportController {
     };
 
     const report = await this.reportService.createReport(reportData);
+    
+    // Generate and save scenario metadata file
+    try {
+      const scenarioFilePath = await this.reportService.saveScenarioMetadata(report.id);
+      report.scenarioFile = scenarioFilePath;
+    } catch (error) {
+      console.error('Error saving scenario metadata:', error);
+      // Continue even if metadata saving fails
+    }
 
     res.status(201).json({
       status: 'success',

@@ -49,4 +49,4 @@ module.exports = (controller) => {
   router.get('/:id', controller.getSpecFileById);
 
   return router;
-}; 
+};

@@ -48,3 +48,7 @@ Thumbs.db
 # Temporary files
 uploads/
 uploads/reports/
+
+# Playwright reports
+playwright-report/
+test-results/

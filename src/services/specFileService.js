@@ -13,10 +13,22 @@ class SpecFileService {
       const fileContent = fs.readFileSync(filePath, 'utf8');
       const parsedJson = convertTestFileToJson(fileContent);
 
+      // Extract domain from URL
+      let domain = null;
+      if (parsedJson.url) {
+        try {
+          const url = new URL(parsedJson.url);
+          domain = `${url.protocol}//${url.hostname}`;
+        } catch (error) {
+          console.error('Failed to parse URL:', error);
+        }
+      }
+
       const specFile = await this.specFileRepository.create({
         originalName: file.originalname,
         uploadPath: filePath,
-        parsedJson
+        parsedJson,
+        url: domain
       });
 
       return specFile;

@@ -43,6 +43,12 @@ class ReportRepository {
       where: { id: reportId }
     });
   }
+
+  async updateScenarioFile(reportId, scenarioFile) {
+    return this.Report.update({ scenarioFile }, {
+      where: { id: reportId }
+    });
+  }
 }
 
 module.exports = ReportRepository;

@@ -60,7 +60,7 @@ const createApp = async (models) => {
   const authService = new AuthService(userRepository);
   const fileService = new FileService(fileRepository);
   const scenarioService = new ScenarioService(scenarioRepository);
-  const reportService = new ReportService(reportRepository);
+  const reportService = new ReportService(reportRepository, scenarioRepository);
   const specFileService = new SpecFileService(specFileRepository);
 
   // Initialize controllers

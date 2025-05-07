@@ -19,6 +19,11 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
+    scenarioFile: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      comment: 'Path to the JSON file containing all scenarios metadata',
+    },
     status: {
       type: DataTypes.ENUM('pending', 'running', 'completed'),
       allowNull: false,
