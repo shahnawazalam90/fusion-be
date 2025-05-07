@@ -57,7 +57,7 @@ function parseAction(step) {
     }
   } else if (raw.includes('getByText')) {
     method = 'getByText';
-    const textMatch = raw.match(/getByText\('([^']+)'\)/);
+    const textMatch = raw.match(/getByText\('([^']+)'/);
     if (textMatch) {
       selector = textMatch[1];
     }
@@ -98,6 +98,14 @@ function convertPlaywrightToJson(scenario, steps) {
       return;
     }
 
+    // Handle 'expect' step without processing it
+    if (step.startsWith('await expect(')) {
+      if (currentScreen) {
+        currentScreen.actions.push({ raw: step.replace(/^await /, '').replace(/;$/, '').trim() });
+        return;
+      }
+    }
+
     // Handle .goto for url (only first one)
     if (step.includes('.goto(')) {
       const urlMatch = step.match(/goto\('([^']+)'\)/);
@@ -126,7 +134,19 @@ function convertPlaywrightToJson(scenario, steps) {
     ) {
       if (currentScreen) {
         const parsed = parseAction(step);
-        if (parsed) currentScreen.actions.push(parsed);
+        const lastAction = currentScreen?.actions[currentScreen.actions.length - 1];
+
+        if (parsed) {
+          if (
+            lastAction &&
+            parsed?.options?.name === lastAction.options?.name &&
+            lastAction.action === 'click'
+          ) {
+            currentScreen?.actions.pop();
+          }
+
+          currentScreen.actions.push(parsed);
+        }
       }
     }
   });
@@ -146,6 +166,7 @@ function convertTestFileToJson(testContent, scenario = "create purchase requisit
     .map(line => line.trim())
     .filter(line =>
       line.startsWith('await page.') ||
+      line.startsWith('await expect') ||
       line.startsWith('//')
     );
 
