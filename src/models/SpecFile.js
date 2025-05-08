@@ -20,8 +20,15 @@ module.exports = (sequelize) => {
       allowNull: true,
     },
     parsedJson: {
-      type: DataTypes.JSONB, // PostgreSQL JSONB type for better performance with JSON data
+      type: DataTypes.TEXT,
       allowNull: false,
+      get() {
+        const rawValue = this.getDataValue('parsedJson');
+        return rawValue ? JSON.parse(rawValue) : null;
+      },
+      set(value) {
+        this.setDataValue('parsedJson', JSON.stringify(value));
+      }
     },
     uploadedAt: {
       type: DataTypes.DATE,

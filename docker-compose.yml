@@ -8,31 +8,37 @@ services:
     ports:
       - '3000:3000'
     depends_on:
-      postgres:
-        condition: service_healthy  # Wait until postgres is healthy
+      mysql:
+        condition: service_healthy
     env_file:
       - .env
     environment:
-      - DB_HOST=postgres
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USERNAME=oracle
+      - DB_PASSWORD=oracle
+      - DB_DATABASE=oracle_fusion
     volumes:
       - ./:/app
       - /app/node_modules
 
-  postgres:
-    image: postgres:16
+  mysql:
+    image: mysql:8.0
     ports:
-      - '5432:5432'
+      - '3306:3306'
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: toor
-      POSTGRES_DB: oracle_fusion
+      MYSQL_ROOT_PASSWORD: toor
+      MYSQL_DATABASE: oracle_fusion
+      MYSQL_USER: oracle
+      MYSQL_PASSWORD: oracle
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - mysql_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "oracle", "-poracle"]
       interval: 5s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
 volumes:
-  postgres_data:
+  mysql_data:

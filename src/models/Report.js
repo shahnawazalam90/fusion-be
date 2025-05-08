@@ -12,8 +12,15 @@ module.exports = (sequelize) => {
       allowNull: false,
     },
     scenarioIds: {
-      type: DataTypes.ARRAY(DataTypes.UUID),
+      type: DataTypes.TEXT,
       allowNull: false,
+      get() {
+        const rawValue = this.getDataValue('scenarioIds');
+        return rawValue ? JSON.parse(rawValue) : [];
+      },
+      set(value) {
+        this.setDataValue('scenarioIds', JSON.stringify(value));
+      }
     },
     filePath: {
       type: DataTypes.STRING,

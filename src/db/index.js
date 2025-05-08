@@ -11,13 +11,18 @@ const SpecFileModel = require('../models/SpecFile');
 
 // Create Sequelize instance
 const sequelize = new Sequelize({
-  dialect: 'postgres',
+  dialect: 'mysql',
   host: config.db.host,
   port: config.db.port,
   username: config.db.username,
   password: config.db.password,
   database: config.db.database,
   logging: (msg) => logger.debug(msg),
+  define: {
+    charset: 'utf8mb4',
+    collate: 'utf8mb4_unicode_ci',
+    timestamps: true
+  }
 });
 
 // Initialize models

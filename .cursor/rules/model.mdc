@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+{
+  "models": "You are a coding assistant. Follow these rules:
+    1. Always follow MDC principles.
+    2. Use async/await instead of callbacks.
+    3. Use sequelize best practices (schema validation, timestamps).
+    4. Do not modify unrelated parts of code.
+    5. Keep API responses in a standardized format { success, data, error }."
+}

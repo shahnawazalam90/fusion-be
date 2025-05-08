@@ -4,7 +4,7 @@ test('test', async ({ page }) => {
 
   // login screen
   await page.goto('https://login-eqne-dev6-saasfademo1.ds-fa.oraclepdemos.com/oam/server/obrareq.cgi?ECID-Context=1.006CzYXZ4lw2VOV6y3U%5EMG009%5EtS00058w%3BkXjE');
-  await page.getByRole('textbox', { name: 'User ID' }).fill('SCM_IMPLt%x7V6X?');
+  await page.getByRole('textbox', { name: 'User ID' }).fill('SCM_IMPL');
   await page.getByRole('textbox', { name: 'User ID' }).press('ControlOrMeta+z');
   await page.getByRole('textbox', { name: 'Password' }).click();
   await page.getByRole('textbox', { name: 'Password' }).fill('t%x7V6X?');
