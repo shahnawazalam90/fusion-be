@@ -208,6 +208,38 @@ class ReportController {
       data: publicUrls,
     });
   });
+
+  async getScenarioMetadata(req, res) {
+    try {
+      const { filename } = req.params;
+      const scenariosDir = path.join(__dirname, '../../../../uploads/scenarios');
+      const filePath = path.join(scenariosDir, filename);
+
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({
+          success: false,
+          message: `Scenario metadata file ${filename} not found`
+        });
+      }
+
+      // Read and parse the JSON file
+      const fileContent = fs.readFileSync(filePath, 'utf-8');
+      const metadata = JSON.parse(fileContent);
+
+      return res.status(200).json({
+        success: true,
+        data: metadata
+      });
+    } catch (error) {
+      console.error('Error getting scenario metadata:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error retrieving scenario metadata',
+        error: error.message
+      });
+    }
+  }
 }
 
 module.exports = ReportController;

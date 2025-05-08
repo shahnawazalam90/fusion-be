@@ -20,6 +20,9 @@ module.exports = (reportController) => {
   
   // View report files
   router.post('/view', authenticateUser, reportController.viewReport);
+
+  // Get scenario metadata
+  router.get('/scenario-metadata/:filename', reportController.getScenarioMetadata);
   
   return router;
 };
