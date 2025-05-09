@@ -21,6 +21,9 @@ module.exports = (reportController) => {
   // View report files
   router.post('/view', authenticateUser, reportController.viewReport);
 
+  // Get JSON for scenarios
+  router.post('/get-json', authenticateUser, reportController.getReportJSON);
+
   // Get scenario metadata
   router.get('/scenario-metadata/:filename', reportController.getScenarioMetadata);
 

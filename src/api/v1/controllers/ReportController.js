@@ -12,9 +12,7 @@ class ReportController {
     this.reportService = reportService;
   }
 
-  createReport = catchAsync(async (req, res) => {
-    const { scenarioIds, status = 'pending' } = req.body;
-
+  getProcessedScenarioIds = (scenarioIds, res) => {
     // Handle both string and array formats for scenarioIds
     let processedScenarioIds;
     if (typeof scenarioIds === 'string') {
@@ -34,14 +32,20 @@ class ReportController {
       });
     }
 
+    return processedScenarioIds;
+  };
+
+  createReport = catchAsync(async (req, res) => {
+    const { scenarioIds, status = 'pending' } = req.body;
+
     const reportData = {
       userId: req.userId,
-      scenarioIds: processedScenarioIds,
+      scenarioIds: this.getProcessedScenarioIds(scenarioIds),
       status
     };
 
     const report = await this.reportService.createReport(reportData);
-    
+
     // Generate and save scenario metadata file
     try {
       const scenarioFilePath = await this.reportService.saveScenarioMetadata(report.id);
@@ -107,14 +111,14 @@ class ReportController {
       playwrightProcess.on('close', async (code, signal) => {
         console.log(`Playwright process exited with code ${code} and signal ${signal}`);
         console.log('Process ended at:', new Date().toISOString());
-        
+
         // Update process information
         const processInfo = this.reportService.activeProcesses.get(report.id);
         if (processInfo) {
           processInfo.isRunning = false;
           processInfo.exitCode = code;
         }
-        
+
         // Update report status based on test result
         const newStatus = code === 0 ? 'completed' : 'failed';
         await this.reportService.updateReportStatus(report.id, newStatus);
@@ -175,7 +179,7 @@ class ReportController {
 
       // Get the report first to check authorization
       const report = await this.reportService.getReportById(req.userId, reportId);
-      
+
       // Update file path and status
       const updatedReport = await this.reportService.updateReportFilePath(reportId, newFilePath);
       const completedReport = await this.reportService.updateReportStatus(reportId, 'completed', new Date());
@@ -198,11 +202,11 @@ class ReportController {
   listReports = catchAsync(async (req, res) => {
     try {
       const reports = await this.reportService.listReportsByUserId(req.userId);
-      
+
       // Enhance reports with running status
       const enhancedReports = await Promise.all(reports.map(async (report) => {
         const reportData = report.toJSON();
-        
+
         // Check if report is running by checking its process
         if (reportData.status === 'running') {
           try {
@@ -266,7 +270,7 @@ class ReportController {
 
     // First verify that the user has access to this report
     await this.reportService.getReportById(req.userId, reportId);
-    
+
     const executedAt = status === 'completed' ? new Date() : null;
     const updatedReport = await this.reportService.updateReportStatus(reportId, status, executedAt);
 
@@ -355,23 +359,42 @@ class ReportController {
     }
   }
 
+  getReportJSON = catchAsync(async (req, res) => {
+    const { scenarioIds } = req.body;
+
+    if (!scenarioIds) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'scenarioIds are required',
+      });
+    }
+
+    const processedScenarioIds = this.getProcessedScenarioIds(scenarioIds, res);
+    const scenarioData = await this.reportService.getScenariosMetaData(processedScenarioIds);
+
+    res.status(200).json({
+      status: 'success',
+      data: scenarioData,
+    });
+  });
+
   deleteAllReports = catchAsync(async (req, res) => {
     try {
       // Get all reports for the current user
       const reports = await this.reportService.listReportsByUserId(req.userId);
-      
+
       // Delete associated files
       for (const report of reports) {
         if (report.filePath) {
           const filePath = path.join('uploads/reports', report.filePath);
           const extractDir = filePath.replace('.zip', '');
-          
+
           // Delete the zip file if it exists
           if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
             console.log(`Deleted file: ${filePath}`);
           }
-          
+
           // Delete the extracted directory if it exists
           if (fs.existsSync(extractDir)) {
             fs.rmSync(extractDir, { recursive: true, force: true });

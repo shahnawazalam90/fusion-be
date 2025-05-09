@@ -13,21 +13,20 @@ class ReportService {
     this.activeProcesses = new Map(); // Store active processes
   }
 
-  
   async createReport(reportData) {
     // Ensure scenarioIds is always an array
     if (reportData.scenarioId && !reportData.scenarioIds) {
-      reportData.scenarioIds = Array.isArray(reportData.scenarioId) 
-        ? reportData.scenarioId 
+      reportData.scenarioIds = Array.isArray(reportData.scenarioId)
+        ? reportData.scenarioId
         : [reportData.scenarioId];
       delete reportData.scenarioId;
     }
-    
+
     // Set default status if not provided
     if (!reportData.status) {
       reportData.status = 'pending';
     }
-    
+
     return this.reportRepository.create(reportData);
   }
 
@@ -63,68 +62,77 @@ class ReportService {
     }
   }
 
-  async saveScenarioMetadata(reportId) {
-    const report = await this.reportRepository.findById(reportId);
-    if (!report) {
-      throw new NotFoundError('Report not found');
-    }
-    
-    // Make sure the uploads/scenarios directory exists
-    const scenariosDir = 'uploads/scenarios';
-    if (!fs.existsSync(scenariosDir)) {
-      fs.mkdirSync(scenariosDir, { recursive: true });
-    }
-    
-    // Get metadata for each scenario
-    const scenarioData = [];
-    for (const scenarioId of report.scenarioIds) {
-      const scenario = await this.scenarioRepository.findById(scenarioId);
-      if (scenario) {
+  async getScenariosMetaData(scenarioIds) {
+    // Fetch all scenarios concurrently
+    const scenarios = await Promise.all(
+      scenarioIds.map((scenarioId) => this.scenarioRepository.findById(scenarioId))
+    );
+
+    // Process each scenario
+    const scenarioData = scenarios
+      .filter((scenario) => scenario) // Filter out null or undefined scenarios
+      .map((scenario) => {
         let jsonData;
         try {
           jsonData = JSON.parse(scenario.jsonMetaData);
           jsonData = jsonData.map((screen) => {
-            let newScreen = {...screen}
+            let newScreen = { ...screen };
             newScreen['actions'] = screen.actions.map((action) => {
               const objectPattern = /(\{[^}]+\})/g;
               if (objectPattern.test(action.raw)) {
                 action.raw = action.raw.replace(objectPattern, (match) => {
                   // Replace properties like name: 'value' with "name": "value"
                   const formattedMatch = match
-                    .replace(/(\w+):/g, '"$1":')  // Add quotes to keys
+                    .replace(/(\w+):/g, '"$1":') // Add quotes to keys
                     .replace(/'([^']+)'/g, '"$1"'); // Replace single quotes with double quotes
                   return formattedMatch;
                 });
               }
-              return action
-            })
-            return newScreen
-          })
+              return action;
+            });
+            return newScreen;
+          });
         } catch (e) {
           // If it's not valid JSON, use it as a string
           jsonData = scenario.jsonMetaData;
         }
-        
-        scenarioData.push({
+
+        return {
           id: scenario.id,
           scenario: scenario.name,
           screens: jsonData,
-          url: scenario.url
-        });
-      }
+          url: scenario.url,
+        };
+      });
+
+    return scenarioData;
+  }
+
+  async saveScenarioMetadata(reportId) {
+    const report = await this.reportRepository.findById(reportId);
+    if (!report) {
+      throw new NotFoundError('Report not found');
     }
-    
+
+    // Make sure the uploads/scenarios directory exists
+    const scenariosDir = 'uploads/scenarios';
+    if (!fs.existsSync(scenariosDir)) {
+      fs.mkdirSync(scenariosDir, { recursive: true });
+    }
+
+    const scenarioData = await this.getScenariosMetaData(report.scenarioIds);
+
     // Generate a unique filename
     const timestamp = new Date().getTime();
     const fileName = `scenario-metadata-${reportId}-${timestamp}.json`;
     const filePath = path.join(scenariosDir, fileName);
-    
+
     // Write the data to the file
     fs.writeFileSync(filePath, JSON.stringify(scenarioData, null, 2));
-    
+
     // Update the report with the file path
     await this.reportRepository.updateScenarioFile(reportId, filePath);
-    
+
     return filePath;
   }
 
@@ -179,7 +187,7 @@ class ReportService {
     if (status === 'completed' && !executedAt) {
       executedAt = new Date();
     }
-    
+
     await this.reportRepository.updateStatus(reportId, status, executedAt);
     return this.reportRepository.findById(reportId);
   }
@@ -240,12 +248,12 @@ class ReportService {
     try {
       // First get all reports for the user
       const reports = await this.reportRepository.findAllByUserId(userId);
-      
+
       // Delete each report
       for (const report of reports) {
         await this.reportRepository.delete(report.id);
       }
-      
+
       return reports.length; // Return the number of deleted reports
     } catch (error) {
       console.error('Error in deleteAllReports service:', error);
