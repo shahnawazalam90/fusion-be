@@ -16,7 +16,10 @@ class ScenarioRepository {
   }
 
   async findAllByUserId(userId) {
-    return this.Scenario.findAll({ where: { userId } });
+    return this.Scenario.findAll({ 
+      where: { userId },
+      order: [['createdAt', 'DESC']]
+    });
   }
 
   async deleteById(id) {
