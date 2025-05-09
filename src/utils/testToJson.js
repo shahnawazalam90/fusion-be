@@ -115,16 +115,6 @@ function convertPlaywrightToJson(scenario, steps) {
       return;
     }
 
-    // Ignore click or press on textbox unless it's a fill
-    if (
-      (step.includes('.click(') || step.includes('.press(')) &&
-      step.includes('getByRole') &&
-      step.match(/getByRole\(\s*'textbox'/) &&
-      !step.includes('.fill(')
-    ) {
-      return;
-    }
-
     // Only process lines with getByRole, getByLabel, getByText, getByTitle
     if (
       step.includes('getByRole') ||
@@ -137,14 +127,6 @@ function convertPlaywrightToJson(scenario, steps) {
         const lastAction = currentScreen?.actions[currentScreen.actions.length - 1];
 
         if (parsed) {
-          if (
-            lastAction &&
-            parsed?.options?.name === lastAction.options?.name &&
-            lastAction.action === 'click'
-          ) {
-            currentScreen?.actions.pop();
-          }
-
           currentScreen.actions.push(parsed);
         }
       }
