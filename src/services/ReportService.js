@@ -10,6 +10,7 @@ class ReportService {
   constructor(reportRepository, scenarioRepository) {
     this.reportRepository = reportRepository;
     this.scenarioRepository = scenarioRepository;
+    this.activeProcesses = new Map(); // Store active processes
   }
 
   
@@ -123,16 +124,6 @@ class ReportService {
     
     // Update the report with the file path
     await this.reportRepository.updateScenarioFile(reportId, filePath);
-
-    // Execute the Playwright script with the generated metadata file
-    // const executionResult = await this.executePlaywrightScript(filePath);
-    
-    // // Update the report status based on the execution result
-    // if (executionResult.success) {
-    //   await this.updateReportStatus(reportId, 'completed');
-    // } else {
-    //   await this.updateReportStatus(reportId, 'failed');
-    // }
     
     return filePath;
   }
@@ -147,7 +138,7 @@ class ReportService {
     }
 
     // Check pending reports for folder existence
-    const pendingReports = reports.filter(report => report.status === 'pending');
+    const pendingReports = reports.filter(report => report.filePath == null || report.filePath == '');
     for (const report of pendingReports) {
       if (report.scenarioFile) {
         // Get the basename without extension
@@ -157,7 +148,7 @@ class ReportService {
         // Check if folder exists
         if (fs.existsSync(reportFolderPath)) {
           // Update report status and filepath with just the folder name
-          await this.updateReportStatus(report.id, 'completed');
+          await this.updateReportStatus(report.id, report.status == 'pending' ? 'completed' : report.status);
           await this.updateReportFilePath(report.id, folderName);
         }
       }
@@ -238,6 +229,39 @@ class ReportService {
     }
 
     return report;
+  }
+
+  async deleteAllReports(userId) {
+    try {
+      // First get all reports for the user
+      const reports = await this.reportRepository.findAllByUserId(userId);
+      
+      // Delete each report
+      for (const report of reports) {
+        await this.reportRepository.delete(report.id);
+      }
+      
+      return reports.length; // Return the number of deleted reports
+    } catch (error) {
+      console.error('Error in deleteAllReports service:', error);
+      throw error;
+    }
+  }
+
+  async getReportProcess(reportId) {
+    const process = this.activeProcesses.get(reportId);
+    if (!process) {
+      return null;
+    }
+
+    try {
+      // Check if process is still running
+      process.isRunning = process.pid && process.exitCode === null;
+      return process;
+    } catch (error) {
+      console.error('Error checking process status:', error);
+      return null;
+    }
   }
 }
 

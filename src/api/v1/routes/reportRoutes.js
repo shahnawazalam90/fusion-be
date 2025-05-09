@@ -23,6 +23,9 @@ module.exports = (reportController) => {
 
   // Get scenario metadata
   router.get('/scenario-metadata/:filename', reportController.getScenarioMetadata);
+
+  // Delete all reports
+  router.delete('/all', authenticateUser, reportController.deleteAllReports);
   
   return router;
 };

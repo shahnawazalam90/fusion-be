@@ -49,6 +49,20 @@ class ReportRepository {
       where: { id: reportId }
     });
   }
+
+  async delete(reportId) {
+    try {
+      const result = await this.Report.destroy({
+        where: {
+          id: reportId
+        }
+      });
+      return result;
+    } catch (error) {
+      console.error('Error in ReportRepository delete:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = ReportRepository;

@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { extractZipFile, generatePublicRoutes } = require('../../../utils/fileUtil');
+const { spawn } = require('child_process');
 
 const upload = multer({ dest: 'uploads/reports/' });
 
@@ -45,14 +46,98 @@ class ReportController {
     try {
       const scenarioFilePath = await this.reportService.saveScenarioMetadata(report.id);
       report.scenarioFile = scenarioFilePath;
+
+      // Extract filename from the full path
+      const filename = path.basename(scenarioFilePath);
+
+      console.log('Starting Playwright process with file:', filename);
+
+      // Execute Playwright script
+      const playwrightProcess = spawn('npx', [
+        'playwright',
+        'test',
+        '--project=chromium',
+        '--headed',
+        'uploads/scripts/demo_latest.spec.ts'
+      ], {
+        env: {
+          ...process.env,
+          DATAFILE: filename
+        },
+        stdio: ['inherit', 'pipe', 'pipe'] // Capture stdout and stderr
+      });
+
+      // Store process information
+      this.reportService.activeProcesses.set(report.id, {
+        pid: playwrightProcess.pid,
+        startTime: new Date().toISOString(),
+        isRunning: true,
+        exitCode: null
+      });
+
+      // Log process information
+      console.log('Playwright Process ID:', playwrightProcess.pid);
+      console.log('Process started at:', new Date().toISOString());
+
+      // Handle stdout
+      playwrightProcess.stdout.on('data', (data) => {
+        console.log(`Playwright stdout: ${data}`);
+      });
+
+      // Handle stderr
+      playwrightProcess.stderr.on('data', (data) => {
+        console.error(`Playwright stderr: ${data}`);
+      });
+
+      playwrightProcess.on('error', (error) => {
+        console.error('Failed to start Playwright process:', error);
+        this.reportService.updateReportStatus(report.id, 'failed');
+        // Update process information
+        const processInfo = this.reportService.activeProcesses.get(report.id);
+        if (processInfo) {
+          processInfo.isRunning = false;
+          processInfo.exitCode = -1;
+        }
+      });
+
+      // Update report status to 'running' when test starts
+      await this.reportService.updateReportStatus(report.id, 'running');
+
+      // Handle test completion
+      playwrightProcess.on('close', async (code, signal) => {
+        console.log(`Playwright process exited with code ${code} and signal ${signal}`);
+        console.log('Process ended at:', new Date().toISOString());
+        
+        // Update process information
+        const processInfo = this.reportService.activeProcesses.get(report.id);
+        if (processInfo) {
+          processInfo.isRunning = false;
+          processInfo.exitCode = code;
+        }
+        
+        // Update report status based on test result
+        const newStatus = code === 0 ? 'completed' : 'failed';
+        await this.reportService.updateReportStatus(report.id, newStatus);
+      });
+
+      // Handle process termination
+      playwrightProcess.on('exit', (code, signal) => {
+        console.log(`Playwright process terminated with code ${code} and signal ${signal}`);
+      });
+
     } catch (error) {
-      console.error('Error saving scenario metadata:', error);
+      console.error('Error saving scenario metadata or executing Playwright:', error);
       // Continue even if metadata saving fails
     }
 
     res.status(201).json({
       status: 'success',
       data: report,
+      message: 'Report created and test execution started',
+      processInfo: {
+        started: new Date().toISOString(),
+        status: 'running'
+      }
     });
   });
 
@@ -111,25 +196,54 @@ class ReportController {
   });
 
   listReports = catchAsync(async (req, res) => {
-    const { scenarioId, status } = req.query;
-    
-    let reports;
-    if (scenarioId) {
-      reports = await this.reportService.listReportsByScenarioId(scenarioId);
-      // Filter by status if provided
-      if (status) {
-        reports = reports.filter(report => report.status === status);
-      }
-    } else if (status) {
-      reports = await this.reportService.listReportsByUserId(req.userId, status);
-    } else {
-      reports = await this.reportService.listReportsByUserId(req.userId);
-    }
+    try {
+      const reports = await this.reportService.listReportsByUserId(req.userId);
+      
+      // Enhance reports with running status
+      const enhancedReports = await Promise.all(reports.map(async (report) => {
+        const reportData = report.toJSON();
+        
+        // Check if report is running by checking its process
+        if (reportData.status === 'running') {
+          try {
+            // Check if process exists and is running
+            const process = await this.reportService.getReportProcess(reportData.id);
+            if (!process || !process.isRunning) {
+              // Update status to failed if process is not running
+              await this.reportService.updateReportStatus(reportData.id, 'failed');
+              reportData.status = 'failed';
+            } else {
+              reportData.processInfo = {
+                pid: process.pid,
+                startTime: process.startTime,
+                isRunning: true
+              };
+            }
+          } catch (error) {
+            console.error(`Error checking process for report ${reportData.id}:`, error);
+            // Update status to failed if there's an error checking the process
+            await this.reportService.updateReportStatus(reportData.id, 'failed');
+            reportData.status = 'failed';
+          }
+        }
 
-    res.status(200).json({
-      status: 'success',
-      data: reports,
-    });
+        return reportData;
+      }));
+
+      return res.status(200).json({
+        status: 'success',
+        data: {
+          reports: enhancedReports
+        }
+      });
+    } catch (error) {
+      console.error('Error in listReports:', error);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Failed to list reports',
+        error: error.message
+      });
+    }
   });
 
   updateReportStatus = catchAsync(async (req, res) => {
@@ -240,6 +354,61 @@ class ReportController {
       });
     }
   }
+
+  deleteAllReports = catchAsync(async (req, res) => {
+    try {
+      // Get all reports for the current user
+      const reports = await this.reportService.listReportsByUserId(req.userId);
+      
+      // Delete associated files
+      for (const report of reports) {
+        if (report.filePath) {
+          const filePath = path.join('uploads/reports', report.filePath);
+          const extractDir = filePath.replace('.zip', '');
+          
+          // Delete the zip file if it exists
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+            console.log(`Deleted file: ${filePath}`);
+          }
+          
+          // Delete the extracted directory if it exists
+          if (fs.existsSync(extractDir)) {
+            fs.rmSync(extractDir, { recursive: true, force: true });
+            console.log(`Deleted directory: ${extractDir}`);
+          }
+        }
+
+        // Delete scenario metadata file if it exists
+        if (report.scenarioFile) {
+          const scenarioPath = path.join('uploads/scenarios', path.basename(report.scenarioFile));
+          if (fs.existsSync(scenarioPath)) {
+            fs.unlinkSync(scenarioPath);
+            console.log(`Deleted scenario file: ${scenarioPath}`);
+          }
+        }
+      }
+
+      // Delete all reports from database
+      const deletedCount = await this.reportService.deleteAllReports(req.userId);
+
+      return res.status(200).json({
+        status: 'success',
+        message: `Successfully deleted ${deletedCount} reports and their associated files`,
+        data: {
+          deletedReports: deletedCount,
+          deletedFiles: reports.length
+        }
+      });
+    } catch (error) {
+      console.error('Error deleting reports:', error);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Error deleting reports',
+        error: error.message
+      });
+    }
+  });
 }
 
 module.exports = ReportController;

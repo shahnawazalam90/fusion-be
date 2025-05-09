@@ -32,7 +32,7 @@ module.exports = (sequelize) => {
       comment: 'Path to the JSON file containing all scenarios metadata',
     },
     status: {
-      type: DataTypes.ENUM('pending', 'running', 'completed'),
+      type: DataTypes.ENUM('pending', 'running', 'completed', 'failed'),
       allowNull: false,
       defaultValue: 'pending',
     },
