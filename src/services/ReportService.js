@@ -137,6 +137,9 @@ class ReportService {
       reports = await this.reportRepository.findAllByUserId(userId);
     }
 
+    // Sort reports by createdAt in descending order
+    reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
     // Check pending reports for folder existence
     const pendingReports = reports.filter(report => report.filePath == null || report.filePath == '');
     for (const report of pendingReports) {
@@ -157,9 +160,11 @@ class ReportService {
     // Get updated reports
     if (status) {
       reports = await this.reportRepository.findAllByUserId(userId);
-      return reports.filter(report => report.status === status);
+      return reports.filter(report => report.status === status)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
-    return this.reportRepository.findAllByUserId(userId);
+    return this.reportRepository.findAllByUserId(userId)
+      .then(reports => reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
   }
 
   async listReportsByScenarioId(scenarioId) {
