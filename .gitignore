@@ -46,8 +46,9 @@ docker-compose.override.yml
 Thumbs.db
 
 # Temporary files
-uploads/
 uploads/reports/
+uploads/scenarios/
+uploads/specs/
 
 # Playwright reports
 playwright-report/
