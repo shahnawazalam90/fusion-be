@@ -25,6 +25,18 @@ class ScenarioRepository {
   async deleteById(id) {
     return this.Scenario.destroy({ where: { id } });
   }
+
+  async updateScenario(id, jsonMetaData) {
+    const scenario = await this.Scenario.findByPk(id);
+    if (!scenario) {
+      return null;
+    }
+
+    scenario.jsonMetaData = jsonMetaData;
+    await scenario.save();
+
+    return scenario;
+  }
 }
 
 module.exports = ScenarioRepository;

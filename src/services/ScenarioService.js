@@ -28,6 +28,18 @@ class ScenarioService {
     }
     return deleted;
   }
+
+  async updateScenario(id, jsonMetaData) {
+    const scenario = await this.scenarioRepository.findById(id);
+    if (!scenario) {
+      throw new NotFoundError('Scenario not found');
+    }
+
+    scenario.jsonMetaData = jsonMetaData;
+    await scenario.save();
+
+    return scenario;
+  }
 }
 
 module.exports = ScenarioService;

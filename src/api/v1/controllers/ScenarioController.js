@@ -33,6 +33,24 @@ class ScenarioController {
     });
   });
 
+  updateScenario = catchAsync(async (req, res) => {
+    const { id, jsonMetaData } = req.body;
+
+    if (!id || !jsonMetaData) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Scenario ID and jsonMetaData are required',
+      });
+    }
+
+    const updatedScenario = await this.scenarioService.updateScenario(id, jsonMetaData);
+
+    res.status(200).json({
+      status: 'success',
+      data: updatedScenario,
+    });
+  });
+
   deleteScenario = catchAsync(async (req, res) => {
     await this.scenarioService.deleteScenario(req.params.id);
 
