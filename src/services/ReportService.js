@@ -1,17 +1,15 @@
 const { UnauthorizedError, NotFoundError } = require('../utils/errors');
 const { extractZipFile, generatePublicRoutes } = require('../utils/fileUtil');
 const { formatScenarioMetadata } = require('../utils/metadataFormatter');
+const processManager = require('../utils/ProcessManager');
+const playwrightManager = require('../utils/PlaywrightManager');
 const path = require('path');
 const fs = require('fs');
-const { exec } = require('child_process');
-const util = require('util');
-const execPromise = util.promisify(exec);
 
 class ReportService {
   constructor(reportRepository, scenarioRepository) {
     this.reportRepository = reportRepository;
     this.scenarioRepository = scenarioRepository;
-    this.activeProcesses = new Map(); // Store active processes
   }
 
   async createReport(reportData) {
@@ -31,35 +29,21 @@ class ReportService {
     return this.reportRepository.create(reportData);
   }
 
-  async executePlaywrightScript(scenarioMetadataPath) {
+  async executePlaywrightTest(reportId, dataFile) {
     try {
-      // Ensure the scripts directory exists
-      const scriptsDir = 'uploads/scripts';
-      if (!fs.existsSync(scriptsDir)) {
-        throw new Error('Playwright scripts directory not found');
-      }
+      const processInfo = await playwrightManager.executeTest({
+        reportId,
+        dataFile,
+        onStatusUpdate: async (status) => {
+          await this.updateReportStatus(reportId, status);
+        }
+      });
 
-      // Set the DATAFILE environment variable to point to our scenario metadata
-      const env = {
-        ...process.env,
-        DATAFILE: path.basename(scenarioMetadataPath),
-      };
-
-      // Execute the Playwright script
-      const { stdout, stderr } = await execPromise(
-        'npx playwright test --project=chromium uploads/scripts/demo_latest.spec.js',
-        { env }
-      );
-
-      console.log('Playwright script output:', stdout);
-      if (stderr) {
-        console.error('Playwright script errors:', stderr);
-      }
-
-      return { success: true, output: stdout };
+      return processInfo;
     } catch (error) {
-      console.error('Error executing Playwright script:', error);
-      return { success: false, error: error.message };
+      console.error('Error executing Playwright test:', error);
+      await this.updateReportStatus(reportId, 'failed');
+      throw error;
     }
   }
 
@@ -281,19 +265,7 @@ class ReportService {
   }
 
   async getReportProcess(reportId) {
-    const process = this.activeProcesses.get(reportId);
-    if (!process) {
-      return null;
-    }
-
-    try {
-      // Check if process is still running
-      process.isRunning = process.pid && process.exitCode === null;
-      return process;
-    } catch (error) {
-      console.error('Error checking process status:', error);
-      return null;
-    }
+    return processManager.getProcess(reportId);
   }
 
   getProcessedScenarioIds = (scenarioIds, res) => {
