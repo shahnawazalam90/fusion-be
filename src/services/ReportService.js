@@ -1,5 +1,6 @@
 const { UnauthorizedError, NotFoundError } = require('../utils/errors');
 const { extractZipFile, generatePublicRoutes } = require('../utils/fileUtil');
+const { formatScenarioMetadata } = require('../utils/metadataFormatter');
 const path = require('path');
 const fs = require('fs');
 const { exec } = require('child_process');
@@ -41,7 +42,7 @@ class ReportService {
       // Set the DATAFILE environment variable to point to our scenario metadata
       const env = {
         ...process.env,
-        DATAFILE: path.basename(scenarioMetadataPath)
+        DATAFILE: path.basename(scenarioMetadataPath),
       };
 
       // Execute the Playwright script
@@ -65,7 +66,9 @@ class ReportService {
   async getScenariosMetaData(scenarioIds) {
     // Fetch all scenarios concurrently
     const scenarios = await Promise.all(
-      scenarioIds.map((scenarioId) => this.scenarioRepository.findById(scenarioId))
+      scenarioIds.map((scenarioId) =>
+        this.scenarioRepository.findById(scenarioId)
+      )
     );
 
     // Process each scenario
@@ -140,7 +143,7 @@ class ReportService {
     let reports;
     if (status) {
       reports = await this.reportRepository.findAllByUserId(userId);
-      reports = reports.filter(report => report.status === status);
+      reports = reports.filter((report) => report.status === status);
     } else {
       reports = await this.reportRepository.findAllByUserId(userId);
     }
@@ -149,17 +152,25 @@ class ReportService {
     reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
     // Check pending reports for folder existence
-    const pendingReports = reports.filter(report => report.filePath == null || report.filePath == '');
+    const pendingReports = reports.filter(
+      (report) => report.filePath == null || report.filePath == ''
+    );
     for (const report of pendingReports) {
       if (report.scenarioFile) {
         // Get the basename without extension
-        const folderName = path.basename(report.scenarioFile, path.extname(report.scenarioFile));
+        const folderName = path.basename(
+          report.scenarioFile,
+          path.extname(report.scenarioFile)
+        );
         const reportFolderPath = path.join('uploads', 'reports', folderName);
 
         // Check if folder exists
         if (fs.existsSync(reportFolderPath)) {
           // Update report status and filepath with just the folder name
-          await this.updateReportStatus(report.id, report.status == 'pending' ? 'completed' : report.status);
+          await this.updateReportStatus(
+            report.id,
+            report.status == 'pending' ? 'completed' : report.status
+          );
           await this.updateReportFilePath(report.id, folderName);
         }
       }
@@ -168,11 +179,15 @@ class ReportService {
     // Get updated reports
     if (status) {
       reports = await this.reportRepository.findAllByUserId(userId);
-      return reports.filter(report => report.status === status)
+      return reports
+        .filter((report) => report.status === status)
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
-    return this.reportRepository.findAllByUserId(userId)
-      .then(reports => reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+    return this.reportRepository
+      .findAllByUserId(userId)
+      .then((reports) =>
+        reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      );
   }
 
   async listReportsByScenarioId(scenarioId) {
@@ -211,7 +226,9 @@ class ReportService {
     }
 
     if (report.userId !== userId) {
-      throw new UnauthorizedError('You are not authorized to access this report');
+      throw new UnauthorizedError(
+        'You are not authorized to access this report'
+      );
     }
 
     if (!report.filePath) {
@@ -238,7 +255,9 @@ class ReportService {
     }
 
     if (report.userId !== userId) {
-      throw new UnauthorizedError('You are not authorized to access this report');
+      throw new UnauthorizedError(
+        'You are not authorized to access this report'
+      );
     }
 
     return report;
@@ -276,6 +295,50 @@ class ReportService {
       return null;
     }
   }
+
+  getProcessedScenarioIds = (scenarioIds, res) => {
+    // Handle both string and array formats for scenarioIds
+    let processedScenarioIds;
+    if (typeof scenarioIds === 'string') {
+      try {
+        // Try to parse as JSON array
+        processedScenarioIds = JSON.parse(scenarioIds);
+      } catch (e) {
+        // If not valid JSON, treat as comma-separated string
+        processedScenarioIds = scenarioIds.split(',').map(id => id.trim());
+      }
+    } else if (Array.isArray(scenarioIds)) {
+      processedScenarioIds = scenarioIds;
+    } else {
+      return res.status(400).json({
+        status: 'error',
+        message: 'scenarioIds must be provided as an array or comma-separated string',
+      });
+    }
+
+    return processedScenarioIds;
+  };
+
+  getReportJSON = async (req, res) => {
+    const { scenarioIds } = req.body;
+
+    if (!scenarioIds) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'scenarioIds are required',
+      });
+    }
+
+    const processedScenarioIds = this.getProcessedScenarioIds(scenarioIds, res);
+    const scenarioData = await this.reportService.getScenariosMetaData(
+      processedScenarioIds
+    );
+
+    res.status(200).json({
+      status: 'success',
+      data: scenarioData,
+    });
+  };
 }
 
 module.exports = ReportService;

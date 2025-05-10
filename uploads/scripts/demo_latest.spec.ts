@@ -23,7 +23,7 @@ type LocatorMethods =
   | "getByTitle";
 
 interface Action {
-  actionType: string;
+  action: string;
   locatorType: string;
   params: any[];
   parsedValue?: string;
@@ -42,18 +42,23 @@ let outputfile: fs.PathOrFileDescriptor;
 
 let requisitionId: string;
 let browser;
+let purchaseOrderId: string;
+let salesOrderId: string;
+let pickWaveId: string;
+let shipmentId: string;
+let processId: string;
 
 
-
-testData.forEach((data: { scenario: any; url: string; screens: any; }, index: any) => {
+testData.forEach((data, index) => {
   test.describe(`Test Suite for ${data.scenario} screen - ${index}`, () => {
     test(`${data.scenario} test case - ${index}`, async ({ page }) => {
       await page.goto(data.url);
       let count = 0;
+
       for (const screen of data.screens) {
-        for (const action of screen.actions) {
-          console.log(`${count++} action: ${action.raw}`);
-          await performActions(page, action);
+        for (const screenAction of screen.actions) {
+          console.log(`${count++} action: ${screenAction.raw}`);
+          await performActions(page, screenAction, screen.screenName);
         }
       }
 
@@ -62,57 +67,118 @@ testData.forEach((data: { scenario: any; url: string; screens: any; }, index: an
   });
 });
 
-test.afterAll(async ({browser})=> {
+test.afterAll(async ({ browser }) => {
   await browser.close();
-})
+});
 
-
-
-
-
-async function performActions(page: Page, action: Action) {
+async function performActions(page: Page, screen: Action, screenName: string): Promise<void> {
   const pattern = /(\w+)\('([^']*)'(?:,\s*({[^}]*}))?\)(?:\.(\w+)\(({[^}]*})\))?(?:\.(\w+)\('([^']*)'(?:,\s*({[^}]*}))?\))?\.(\w+)\(?([^)]*)?\)?/;
-
-  const match = action.raw.match(pattern);
+  const match = screen.raw.match(pattern);
 
   if (match) {
     const [, method1, param1, options1, method2, param2, method3, param3, options3, actionType, value] = match;
-
     const locatorOptions = options1 ? JSON.parse(options1) : {};
-
-    let element = await page[method1](param1, options1 && options1.startsWith('{') ? JSON.parse(options1) : {});
+    let element = await page[method1](param1, locatorOptions);
 
     if (method3) {
-      element = await element[method3](param3, options3 && options3.startsWith('{') ? JSON.parse(options3) : {});
+      element = await element[method3](param3, options3 ? JSON.parse(options3) : {});
     }
 
-    // Perform the appropriate action
-    if (actionType === "click") {
-      await element.nth(0).click();
-      await page.waitForTimeout(1000);
-    } else if (actionType === "press") {
-      const sanitizedValue = action.value || '';
-      await element.nth(0).press(sanitizedValue);
-      await page.waitForTimeout(1000);
-    } else if (actionType === "fill") {
-      console.log(`Filling value: ${action.value} for element: ${param1}`);
-      await element.nth(0).fill(action.value || '');
-      await page.waitForTimeout(1000);
+    switch (screen.action) {
+      case "click":
+        if (screen.raw.includes("Refresh")) {
+                // Handle the "Refresh" action
+                await waitUntilOrderStatusChange(page, element.nth(0));
+        } else if (/getByRole\('link',\s*\{\s*"name":\s*"\d+"\s*\}\)\.click\(\)/.test(screen.raw)) {
+                    const customXpath = '//table[@summary="Search Results"]//a';
+                    pickWaveId = await page.locator(customXpath).nth(0).textContent();
+                    console.log(`Pick Wave ID: ${pickWaveId}`);
+                    await page.locator(customXpath).nth(0).click();
+        }else if (screen.raw.includes("Interfaces shipping details")) {
+          await page.waitForTimeout(8000)
+          await element.nth(0).click();
+        } else if (screen.raw.includes("getByText")) {
+             if (screen.raw.includes("Requisition")) {
+                const textContent = await element.nth(0).textContent();
+                requisitionId = await extractRequisition(textContent);
+                console.log(`Requisition ID: ${requisitionId}`);
+            } else if (screen.raw.includes("Purchase Orders")) {
+                const textContent = await element.nth(0).textContent();
+                purchaseOrderId = await extractRequisition(textContent);
+                console.log(`****** Purchase Order ID: ${purchaseOrderId} ******`);
+            } else if (screen.raw.includes("Sales order")) {
+                const salesOrderIDMsg = await page.getByText(/Sales order \d+ was/).textContent();
+                salesOrderId = await extractRequisition(salesOrderIDMsg);
+                console.log(`****** Sales Order ID: ${salesOrderId} ******`);
+            } else if (screen.raw.includes("The shipment")) {
+                const shippmentMsg = await page.getByText(/The shipment \d+ was confirmed./).textContent();
+                shipmentId = await extractRequisition(shippmentMsg);
+                console.log(`****** The shipment ID: ${shipmentId} ******`);
+            }else if (screen.raw.includes("Process")) {
+                const processIdMsg = await page.getByText(/Process \d+ was submitted./).textContent();
+                processId = await extractRequisition(processIdMsg);
+                console.log(`The process ID: ${processId}`);
+            }else if (screen.raw.includes("Shipped")) {
+                const orderStatus = await page.getByText('Shipped').textContent();
+                expect(orderStatus).toEqual("Shipped");
+                console.log(`Order Status: ${orderStatus}`);
+             } else {
+              await element.nth(0).click();
+              await page.waitForTimeout(1000);
+            }
+        } else {
+            await element.nth(0).hover();
+            await element.nth(0).click();
+            await page.waitForTimeout(1000);
+        }
+        break;
+      case "press":
+        const sanitizedValue = screen.parsedValue?.replace(/^'(.*)'$/, "$1");
+        await element.nth(0).press(sanitizedValue);
+        await page.waitForTimeout(1000);
+        break;
 
-      if (action.raw.includes('combobox')) {
-        await executeCopyPaste(element.nth(0), page);
-      }
-    } else if (actionType === "selectOption") {
-      const sanitizedValue = action.value || '';
-      try {
-        await element.nth(0).selectOption(sanitizedValue);
+      case "fill":
+        const fillValue = screen.parsedValue?.replace(/^'(.*)'$/, "$1");
+            await element.nth(0).fill(fillValue);
+            if (screen.raw.includes("From Shipment") || screen.raw.includes("To Shipment")) {
+                element.nth(0).fill(shipmentId);
+            }
+
+
+        if (screen.raw.includes("combobox")) {
+          await executeCopyPaste(element.nth(0), page);
+            }
+
+            if (screen.raw.includes("Manage Shipment Interface")) {
+                await element.nth(0).click();
+                await page.waitForTimeout(3000);
+              }
+
+        if (screen.raw.includes("Requisition")) {
+          await element.nth(0).fill(requisitionId);
+        }
+
+        if (fillValue === '' && screen.raw.includes("Order")) {
+            await element.nth(0).fill(`${salesOrderId}`);
+            await element.nth(0).press("Tab");
+            await page.waitForTimeout(2000)
+        }
+        break;
+
+      case "selectOption":
+        const selectValue = screen.parsedValue?.replace(/^'(.*)'$/, "$1");
+        await element.nth(0).click();
+        await element.nth(0).selectOption(selectValue);
         await page.waitForTimeout(2000);
-        await element.first().press('Tab');
-      } catch (error) {
-        console.error('Error in selectOption:', error);
-      }
-    } else {
-      console.error(`Unsupported action type: ${actionType}`);
+        break;
+
+      case "expect":
+        await handleDynamicAssertion(element.nth(0), screen.assertionType, screen.parsedValue);
+        break;
+
+      default:
+        console.error(`Unsupported action type: ${screen.action}`);
     }
   }
 }
@@ -294,6 +360,15 @@ function peformAction(action: string, element: Locator, value: string) {
     throw new Error("mathcing action is not implemented.");
   }
 
+}
+
+async function waitUntilOrderStatusChange(page: Page, element: Locator) {
+  while (!(await page.getByRole("cell", { name: "Awaiting Shipping", exact: true }).isVisible())
+    && !(await page.getByRole("cell", { name: "Shipped", exact: true }).isVisible())) {
+  await element.click();
+  await page.waitForTimeout(3000);
+}
+//   console.log("Order status changed to Awaiting Shipping.");
 }
 
 

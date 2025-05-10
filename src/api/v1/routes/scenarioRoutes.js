@@ -8,6 +8,9 @@ module.exports = (scenarioController) => {
   router.get('/', authenticateUser, scenarioController.listScenarios);
   router.delete('/:id', authenticateUser, scenarioController.deleteScenario);
   router.put('/update', authenticateUser, scenarioController.updateScenario);
+  
+  // Get scenario metadata
+  router.get('/:id/metadata', authenticateUser, scenarioController.getScenarioMetadata);
 
   return router;
 };

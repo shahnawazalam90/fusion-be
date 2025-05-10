@@ -83,14 +83,45 @@ class ReportController {
       console.log('Playwright Process ID:', playwrightProcess.pid);
       console.log('Process started at:', new Date().toISOString());
 
+      let testOutput = '';
+      let testError = '';
+
       // Handle stdout
       playwrightProcess.stdout.on('data', (data) => {
-        console.log(`Playwright stdout: ${data}`);
+        const output = data.toString();
+        console.log(`Playwright stdout: ${output}`);
+        testOutput += output;
+
+        // Check for timeout in the output
+        if (output.includes('Test timeout') || output.includes('exceeded')) {
+          console.log('Test timeout detected, marking report as failed');
+          this.reportService.updateReportStatus(report.id, 'failed');
+          // Update process information
+          const processInfo = this.reportService.activeProcesses.get(report.id);
+          if (processInfo) {
+            processInfo.isRunning = false;
+            processInfo.exitCode = -1;
+          }
+        }
       });
 
       // Handle stderr
       playwrightProcess.stderr.on('data', (data) => {
-        console.error(`Playwright stderr: ${data}`);
+        const error = data.toString();
+        console.error(`Playwright stderr: ${error}`);
+        testError += error;
+
+        // Check for timeout in the error output
+        if (error.includes('Test timeout') || error.includes('exceeded')) {
+          console.log('Test timeout detected in error output, marking report as failed');
+          this.reportService.updateReportStatus(report.id, 'failed');
+          // Update process information
+          const processInfo = this.reportService.activeProcesses.get(report.id);
+          if (processInfo) {
+            processInfo.isRunning = false;
+            processInfo.exitCode = -1;
+          }
+        }
       });
 
       playwrightProcess.on('error', (error) => {
@@ -127,11 +158,16 @@ class ReportController {
       // Handle process termination
       playwrightProcess.on('exit', (code, signal) => {
         console.log(`Playwright process terminated with code ${code} and signal ${signal}`);
+        // If the process exits with a non-zero code, mark as failed
+        if (code !== 0) {
+          this.reportService.updateReportStatus(report.id, 'failed');
+        }
       });
 
     } catch (error) {
       console.error('Error saving scenario metadata or executing Playwright:', error);
-      // Continue even if metadata saving fails
+      // Update status to failed if there's an error
+      await this.reportService.updateReportStatus(report.id, 'failed');
     }
 
     res.status(201).json({
