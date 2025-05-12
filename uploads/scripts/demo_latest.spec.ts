@@ -106,6 +106,11 @@ async function performActions(page: Page, screen: Action, screenName: string): P
                 const textContent = await element.nth(0).textContent();
                 purchaseOrderId = await extractRequisition(textContent);
                 console.log(`****** Purchase Order ID: ${purchaseOrderId} ******`);
+            }else if (screen.raw.includes("was released")) {
+                const textContent = await page.getByText(/Pick wave \d+ was released/).textContent();
+               pickWaveId1 = await extractRequisition(textContent);
+                 expect(textContent).toMatch(/Pick wave \d+ was released. Number of pick slips: 1 and number of picks: 1./);
+                console.log(`****** Pick wave ID1: ${pickWaveId1} ******`);
             } else if (screen.raw.includes("Sales order")) {
                 const salesOrderIDMsg = await page.getByText(/Sales order \d+ was/).textContent();
                 salesOrderId = await extractRequisition(salesOrderIDMsg);
@@ -126,8 +131,12 @@ async function performActions(page: Page, screen: Action, screenName: string): P
               await element.nth(0).click();
               await page.waitForTimeout(1000);
             }
+        } else if (screen.raw.includes("Order Management")) {
+            console.log(`Clicking on element: ${await element.nth(0).isVisible()}`);
+            await selectTabByPageIndex(page, "Order Management", element.nth(0));
         } else {
-            await element.nth(0).hover();
+          // await element.nth(0).scrollIntoViewIfNeeded();
+          await element.nth(0).hover();
             await element.nth(0).click();
             await page.waitForTimeout(1000);
         }
@@ -139,7 +148,7 @@ async function performActions(page: Page, screen: Action, screenName: string): P
         break;
 
       case "fill":
-        const fillValue = screen.parsedValue?.replace(/^'(.*)'$/, "$1");
+        const fillValue = screen.value?.replace(/^'(.*)'$/, "$1");
             await element.nth(0).fill(fillValue);
             if (screen.raw.includes("From Shipment") || screen.raw.includes("To Shipment")) {
                 element.nth(0).fill(shipmentId);
@@ -159,7 +168,7 @@ async function performActions(page: Page, screen: Action, screenName: string): P
           await element.nth(0).fill(requisitionId);
         }
 
-        if (fillValue === '' && screen.raw.includes("Order")) {
+        if (screen.raw.includes("Order")) {
             await element.nth(0).fill(`${salesOrderId}`);
             await element.nth(0).press("Tab");
             await page.waitForTimeout(2000)
@@ -167,7 +176,7 @@ async function performActions(page: Page, screen: Action, screenName: string): P
         break;
 
       case "selectOption":
-        const selectValue = screen.parsedValue?.replace(/^'(.*)'$/, "$1");
+        const selectValue = screen.value?.replace(/^'(.*)'$/, "$1");
         await element.nth(0).click();
         await element.nth(0).selectOption(selectValue);
         await page.waitForTimeout(2000);
@@ -370,5 +379,83 @@ async function waitUntilOrderStatusChange(page: Page, element: Locator) {
 }
 //   console.log("Order status changed to Awaiting Shipping.");
 }
+
+async function selectTabByPageIndex(
+  page: Page, targetText: string, loc: Locator, // The text you are searching for
+  ) {
+      // Mapping text to nav-page-index
+    const textNavPageMap = new Map<string, number>([
+      ["Redwood Sales", 0],
+      ["Service", 0],
+      ["Me", 0],
+      ["Procurement", 0],
+      ["Help Desk", 0],
+      ["Product Management", 0],
+      ["Benefits Administration", 1],
+      ["Subscription Management", 1],
+      ["Contract Management", 1],
+      ["Order Management", 2],
+      ["Supply Chain Execution", 2],
+      ["Receivables", 2],
+      ["Collections", 2],
+      ["Supply Chain Planning", 3],
+      ["Supplier Portal", 3],
+      ["Payables", 3],
+      ["General Accounting", 3],
+      ["Intercompany Accounting", 4],
+      ["Academics", 4],
+      ["Academic Tools", 4],
+      ["Permitting and Licensing", 4],
+      ["Sustainability", 5],
+      ["My Enterprise", 5],
+      ["Tools", 5],
+      ["Configuration", 5],
+      ["PLM Administration", 5],
+      ["PLM Custom Objects", 6],
+      ["Others", 6]
+      ]);
+  
+      // Get the assigned `nav-page-index` for the target text
+    const targetNavPageIndex = textNavPageMap.get(targetText);
+  
+      if (targetNavPageIndex === undefined) {
+          console.log(`Target text "${targetText}" not found in predefined mapping.`);
+          return;
+      }
+  
+      while (true) {
+          const currentNavPageIndex = await page.getAttribute('#navmenu-container', "nav-page-index");
+          console.log(`Current Nav Page Index: ${currentNavPageIndex}`);
+  
+          if (!currentNavPageIndex) {
+              console.log("Unable to retrieve current nav-page-index. Exiting...");
+              return;
+          }
+  
+          // Convert nav-page-index to integer
+          const currentIndex = parseInt(currentNavPageIndex, 10);
+  
+          // If current page index matches the target, click the element
+          if (currentIndex === targetNavPageIndex) {
+              console.log(`"${targetText}" is in the correct nav-page-index, clicking...`);
+  
+             await loc.scrollIntoViewIfNeeded();
+             await loc.click();
+              console.log(`Clicked on "${targetText}" successfully!`);
+              break;
+          }
+  
+          // Navigate left or right based on index comparison
+          if (targetNavPageIndex < currentIndex ) {
+              console.log(`Navigating right to find "${targetText}"...`);
+             await page.locator("//div[@id='clusters-left-nav']").click();
+          } else {
+              console.log(`Navigating left to find "${targetText}"...`);
+              await page.locator("//div[@id='clusters-right-nav']").click();
+          }
+  
+          await page.waitForTimeout(500); // Allow UI update
+      }
+  }
 
 

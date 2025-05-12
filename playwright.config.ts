@@ -34,6 +34,7 @@
       trace: 'on-first-retry',
       viewport: null,
       video: 'on',
+      screenshot: 'on',
       headless: false,
       launchOptions: {
         slowMo: 500,

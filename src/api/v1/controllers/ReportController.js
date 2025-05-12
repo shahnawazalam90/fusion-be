@@ -1,12 +1,9 @@
 const { catchAsync } = require('../../../utils/catchAsync');
-const { UnauthorizedError, NotFoundError } = require('../../../utils/errors');
-const { formatScenarioMetadata } = require('../../../utils/metadataFormatter');
-const processManager = require('../../../utils/ProcessManager');
-const playwrightManager = require('../../../utils/PlaywrightManager');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { extractZipFile, generatePublicRoutes } = require('../../../utils/fileUtil');
+const playwrightManager = require('../../../utils/PlaywrightManager');
 
 const upload = multer({ dest: 'uploads/reports/' });
 
@@ -223,8 +220,6 @@ class ReportController {
     }
 
     const reportFolderPath = path.join('uploads', 'reports', report.filePath);
-    console.log(reportFolderPath, '===========>>>>>EXTRACT DIR+')
-    console.log(report.filePath, '===========>>>>>REPORT FILE PATH+')
     if (!fs.existsSync(reportFolderPath)) {
       return res.status(404).json({
         status: 'error',
@@ -345,6 +340,18 @@ class ReportController {
         error: error.message
       });
     }
+  });
+
+  /**
+   * Stream test execution updates using Server-Sent Events
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  streamTestExecution = catchAsync(async (req, res) => {
+    const { reportId } = req.params;
+    
+    // Add client to PlaywrightManager for SSE
+    playwrightManager.addClient(reportId, res);
   });
 }
 

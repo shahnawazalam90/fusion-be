@@ -29,6 +29,9 @@ module.exports = (reportController) => {
 
   // Delete all reports
   router.delete('/all', authenticateUser, reportController.deleteAllReports);
+
+  // Get real-time test execution updates
+  router.get('/:reportId/stream', reportController.streamTestExecution);
   
   return router;
 };
