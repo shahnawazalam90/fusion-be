@@ -126,7 +126,7 @@ function convertPlaywrightToJson(scenario, steps) {
       step.includes('getByRole') ||
       step.includes('getByLabel') ||
       step.includes('getByText') ||
-      step.includes('getByText') ||
+      step.includes('getByTitle') ||
       step.includes('locator')
     ) {
       if (currentScreen) {
