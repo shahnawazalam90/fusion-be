@@ -27,7 +27,7 @@ module.exports = (sequelize) => {
         return rawValue ? JSON.parse(rawValue) : null;
       },
       set(value) {
-        this.setDataValue('parsedJson', JSON.stringify(value));
+        this.setDataValue('parsedJson', JSON.stringify(value).replace(/\\\\/g, "\\"));
       }
     },
     uploadedAt: {
