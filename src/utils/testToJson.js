@@ -67,6 +67,12 @@ function parseAction(step) {
     if (titleMatch) {
       selector = titleMatch[1];
     }
+  } else if (raw.includes('locator')) {
+    method = 'locator';
+    const titleMatch = raw.match(/locator\('([^']+)'\)/);
+    if (titleMatch) {
+      selector = titleMatch[1];
+    }
   }
 
   return {
@@ -120,7 +126,8 @@ function convertPlaywrightToJson(scenario, steps) {
       step.includes('getByRole') ||
       step.includes('getByLabel') ||
       step.includes('getByText') ||
-      step.includes('getByTitle')
+      step.includes('getByText') ||
+      step.includes('locator')
     ) {
       if (currentScreen) {
         const parsed = parseAction(step);
