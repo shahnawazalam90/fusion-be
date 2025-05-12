@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { extractZipFile, generatePublicRoutes } = require('../../../utils/fileUtil');
-const { spawn } = require('child_process');
+const playwrightManager = require('../../../utils/PlaywrightManager');
 
 const upload = multer({ dest: 'uploads/reports/' });
 
@@ -54,95 +54,27 @@ class ReportController {
       // Extract filename from the full path
       const filename = path.basename(scenarioFilePath);
 
-      console.log('Starting Playwright process with file:', filename);
+      // Execute Playwright test
+      const processInfo = await this.reportService.executePlaywrightTest(
+        report.id,
+        filename
+      );
 
-      // Execute Playwright script
-      const playwrightProcess = spawn('npx', [
-        'playwright',
-        'test',
-        '--project=chromium',
-        '--headed',
-        'uploads/scripts/demo_latest.spec.ts'
-      ], {
-        env: {
-          ...process.env,
-          DATAFILE: filename
-        },
-        stdio: ['inherit', 'pipe', 'pipe'] // Capture stdout and stderr
-      });
-
-      // Store process information
-      this.reportService.activeProcesses.set(report.id, {
-        pid: playwrightProcess.pid,
-        startTime: new Date().toISOString(),
-        isRunning: true,
-        exitCode: null
-      });
-
-      // Log process information
-      console.log('Playwright Process ID:', playwrightProcess.pid);
-      console.log('Process started at:', new Date().toISOString());
-
-      // Handle stdout
-      playwrightProcess.stdout.on('data', (data) => {
-        console.log(`Playwright stdout: ${data}`);
-      });
-
-      // Handle stderr
-      playwrightProcess.stderr.on('data', (data) => {
-        console.error(`Playwright stderr: ${data}`);
-      });
-
-      playwrightProcess.on('error', (error) => {
-        console.error('Failed to start Playwright process:', error);
-        this.reportService.updateReportStatus(report.id, 'failed');
-        // Update process information
-        const processInfo = this.reportService.activeProcesses.get(report.id);
-        if (processInfo) {
-          processInfo.isRunning = false;
-          processInfo.exitCode = -1;
+      res.status(201).json({
+        status: 'success',
+        data: report,
+        message: 'Report created and test execution started',
+        processInfo: {
+          started: processInfo.startTime,
+          status: 'running'
         }
       });
-
-      // Update report status to 'running' when test starts
-      await this.reportService.updateReportStatus(report.id, 'running');
-
-      // Handle test completion
-      playwrightProcess.on('close', async (code, signal) => {
-        console.log(`Playwright process exited with code ${code} and signal ${signal}`);
-        console.log('Process ended at:', new Date().toISOString());
-
-        // Update process information
-        const processInfo = this.reportService.activeProcesses.get(report.id);
-        if (processInfo) {
-          processInfo.isRunning = false;
-          processInfo.exitCode = code;
-        }
-
-        // Update report status based on test result
-        const newStatus = code === 0 ? 'completed' : 'failed';
-        await this.reportService.updateReportStatus(report.id, newStatus);
-      });
-
-      // Handle process termination
-      playwrightProcess.on('exit', (code, signal) => {
-        console.log(`Playwright process terminated with code ${code} and signal ${signal}`);
-      });
-
     } catch (error) {
       console.error('Error saving scenario metadata or executing Playwright:', error);
-      // Continue even if metadata saving fails
+      // Update status to failed if there's an error
+      await this.reportService.updateReportStatus(report.id, 'failed');
+      throw error;
     }
-
-    res.status(201).json({
-      status: 'success',
-      data: report,
-      message: 'Report created and test execution started',
-      processInfo: {
-        started: new Date().toISOString(),
-        status: 'running'
-      }
-    });
   });
 
   uploadReport = catchAsync(async (req, res, next) => {
@@ -202,48 +134,27 @@ class ReportController {
   listReports = catchAsync(async (req, res) => {
     try {
       const reports = await this.reportService.listReportsByUserId(req.userId);
-
-      // Enhance reports with running status
-      const enhancedReports = await Promise.all(reports.map(async (report) => {
-        const reportData = report.toJSON();
-
-        // Check if report is running by checking its process
-        if (reportData.status === 'running') {
-          try {
-            // Check if process exists and is running
-            const process = await this.reportService.getReportProcess(reportData.id);
-            if (!process || !process.isRunning) {
-              // Update status to failed if process is not running
-              await this.reportService.updateReportStatus(reportData.id, 'failed');
-              reportData.status = 'failed';
-            } else {
-              reportData.processInfo = {
-                pid: process.pid,
-                startTime: process.startTime,
-                isRunning: true
-              };
-            }
-          } catch (error) {
-            console.error(`Error checking process for report ${reportData.id}:`, error);
-            // Update status to failed if there's an error checking the process
-            await this.reportService.updateReportStatus(reportData.id, 'failed');
-            reportData.status = 'failed';
+      
+      // Check for running reports and update their status if needed
+      const updatedReports = await Promise.all(reports.map(async (report) => {
+        if (report.status === 'running') {
+          const process = await this.reportService.getReportProcess(report.id);
+          if (process && !process.isRunning) {
+            await this.reportService.updateReportStatus(report.id, process.exitCode === 0 ? 'completed' : 'failed');
+            return { ...report, status: process.exitCode === 0 ? 'completed' : 'failed' };
           }
         }
-
-        return reportData;
+        return report;
       }));
 
-      return res.status(200).json({
-        status: 'success',
-        data: {
-          reports: enhancedReports
-        }
+      res.json({
+        success: true,
+        data: updatedReports
       });
     } catch (error) {
       console.error('Error in listReports:', error);
-      return res.status(500).json({
-        status: 'error',
+      res.status(500).json({
+        success: false,
         message: 'Failed to list reports',
         error: error.message
       });
@@ -309,8 +220,6 @@ class ReportController {
     }
 
     const reportFolderPath = path.join('uploads', 'reports', report.filePath);
-    console.log(reportFolderPath, '===========>>>>>EXTRACT DIR+')
-    console.log(report.filePath, '===========>>>>>REPORT FILE PATH+')
     if (!fs.existsSync(reportFolderPath)) {
       return res.status(404).json({
         status: 'error',
@@ -431,6 +340,18 @@ class ReportController {
         error: error.message
       });
     }
+  });
+
+  /**
+   * Stream test execution updates using Server-Sent Events
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   */
+  streamTestExecution = catchAsync(async (req, res) => {
+    const { reportId } = req.params;
+    
+    // Add client to PlaywrightManager for SSE
+    playwrightManager.addClient(reportId, res);
   });
 }
 

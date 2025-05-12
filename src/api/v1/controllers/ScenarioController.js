@@ -1,4 +1,7 @@
 const { catchAsync } = require('../../../utils/catchAsync');
+const path = require('path');
+const fs = require('fs');
+const { formatScenario } = require('../../../utils/metadataFormatter');
 
 class ScenarioController {
   constructor(scenarioService) {
@@ -55,6 +58,34 @@ class ScenarioController {
     await this.scenarioService.deleteScenario(req.params.id);
 
     res.status(204).send();
+  });
+
+  getScenarioMetadata = catchAsync(async (req, res) => {
+    try {
+      const { id } = req.params;
+      const scenario = await this.scenarioService.getScenarioById(id);
+
+      if (!scenario) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Scenario not found'
+        });
+      }
+
+      const formattedScenario = formatScenario(scenario);
+
+      return res.status(200).json({
+        status: 'success',
+        data: formattedScenario
+      });
+    } catch (error) {
+      console.error('Error getting scenario metadata:', error);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Error retrieving scenario metadata',
+        error: error.message
+      });
+    }
   });
 }
 
