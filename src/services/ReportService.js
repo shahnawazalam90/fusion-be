@@ -135,7 +135,7 @@ class ReportService {
     // Sort reports by createdAt in descending order
     reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    // Check pending reports for folder existence
+    // Check pending reports for folder existence and process status
     const pendingReports = reports.filter(
       (report) => report.filePath == null || report.filePath == ''
     );
@@ -150,11 +150,25 @@ class ReportService {
 
         // Check if folder exists
         if (fs.existsSync(reportFolderPath)) {
-          // Update report status and filepath with just the folder name
-          await this.updateReportStatus(
-            report.id,
-            report.status == 'pending' ? 'completed' : report.status
-          );
+          // Get process status before updating report status
+          const process = await this.getReportProcess(report.id);
+          let newStatus = report.status;
+          
+          if (process) {
+            // If process exists, use its status
+            newStatus = process.exitCode === 0 ? 'completed' : 'failed';
+          } else if (report.status === 'pending') {
+            // If no process exists but folder exists, check for test results
+            const testResultsPath = path.join(reportFolderPath, 'test-results');
+            if (fs.existsSync(testResultsPath)) {
+              // Check if there are any failed tests in the results
+              const hasFailedTests = await this.checkForFailedTests(testResultsPath);
+              newStatus = hasFailedTests ? 'failed' : 'completed';
+            }
+          }
+
+          // Update report status and filepath
+          await this.updateReportStatus(report.id, newStatus);
           await this.updateReportFilePath(report.id, folderName);
         }
       }
@@ -311,6 +325,26 @@ class ReportService {
       data: scenarioData,
     });
   };
+
+  // Helper method to check for failed tests in test results
+  async checkForFailedTests(testResultsPath) {
+    try {
+      const files = await fs.promises.readdir(testResultsPath);
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const content = await fs.promises.readFile(path.join(testResultsPath, file), 'utf-8');
+          const result = JSON.parse(content);
+          if (result.status === 'failed' || result.status === 'timedOut') {
+            return true;
+          }
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Error checking test results:', error);
+      return false;
+    }
+  }
 }
 
 module.exports = ReportService;

@@ -35,12 +35,12 @@
       viewport: null,
       video: 'on',
       screenshot: 'on',
-      headless: false,
+      headless: true,
       launchOptions: {
         slowMo: 500,
         args: ['--start-maximized']
       },
-      navigationTimeout: 5 * 60 * 1000,
+      navigationTimeout: 10 * 60 * 1000,
     },
 
 

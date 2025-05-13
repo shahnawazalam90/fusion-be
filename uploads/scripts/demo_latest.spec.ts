@@ -47,6 +47,8 @@ let salesOrderId: string;
 let pickWaveId: string;
 let shipmentId: string;
 let processId: string;
+let pickWaveId1: string;
+
 
 
 testData.forEach((data, index) => {
@@ -71,74 +73,111 @@ test.afterAll(async ({ browser }) => {
   await browser.close();
 });
 
-async function performActions(page: Page, screen: Action, screenName: string): Promise<void> {
-  const pattern = /(\w+)\('([^']*)'(?:,\s*({[^}]*}))?\)(?:\.(\w+)\(({[^}]*})\))?(?:\.(\w+)\('([^']*)'(?:,\s*({[^}]*}))?\))?\.(\w+)\(?([^)]*)?\)?/;
+async function performActions(
+  page: Page,
+  screen: Action,
+  screenName: string
+): Promise<void> {
+  const pattern =
+    /(\w+)\('([^']*)'(?:,\s*({[^}]*}))?\)(?:\.(\w+)\(({[^}]*})\))?(?:\.(\w+)\('([^']*)'(?:,\s*({[^}]*}))?\))?\.(\w+)\(?([^)]*)?\)?/;
   const match = screen.raw.match(pattern);
 
   if (match) {
-    const [, method1, param1, options1, method2, param2, method3, param3, options3, actionType, value] = match;
+    const [
+      ,
+      method1,
+      param1,
+      options1,
+      method2,
+      param2,
+      method3,
+      param3,
+      options3,
+      actionType,
+      value,
+    ] = match;
     const locatorOptions = options1 ? JSON.parse(options1) : {};
     let element = await page[method1](param1, locatorOptions);
 
     if (method3) {
-      element = await element[method3](param3, options3 ? JSON.parse(options3) : {});
+      element = await element[method3](
+        param3,
+        options3 ? JSON.parse(options3) : {}
+      );
     }
 
     switch (screen.action) {
       case "click":
         if (screen.raw.includes("Refresh")) {
-                // Handle the "Refresh" action
-                await waitUntilOrderStatusChange(page, element.nth(0));
-        } else if (/getByRole\('link',\s*\{\s*"name":\s*"\d+"\s*\}\)\.click\(\)/.test(screen.raw)) {
-                    const customXpath = '//table[@summary="Search Results"]//a';
-                    pickWaveId = await page.locator(customXpath).nth(0).textContent();
-                    console.log(`Pick Wave ID: ${pickWaveId}`);
-                    await page.locator(customXpath).nth(0).click();
-        }else if (screen.raw.includes("Interfaces shipping details")) {
-          await page.waitForTimeout(8000)
+          // Handle the "Refresh" action
+          await waitUntilOrderStatusChange(page, element.nth(0));
+        } else if (
+          /getByRole\('link',\s*\{\s*"name":\s*"\d+"\s*\}\)\.click\(\)/.test(
+            screen.raw
+          )
+        ) {
+          const customXpath = '//table[@summary="Search Results"]//a';
+          pickWaveId = await page.locator(customXpath).nth(0).textContent();
+          logger.info(`Pick Wave ID: ${pickWaveId}`);
+          await page.locator(customXpath).nth(0).click();
+        } else if (screen.raw.includes("Interfaces shipping details")) {
+          await page.waitForTimeout(8000);
           await element.nth(0).click();
         } else if (screen.raw.includes("getByText")) {
-             if (screen.raw.includes("Requisition")) {
-                const textContent = await element.nth(0).textContent();
-                requisitionId = await extractRequisition(textContent);
-                console.log(`Requisition ID: ${requisitionId}`);
-            } else if (screen.raw.includes("Purchase Orders")) {
-                const textContent = await element.nth(0).textContent();
-                purchaseOrderId = await extractRequisition(textContent);
-                console.log(`****** Purchase Order ID: ${purchaseOrderId} ******`);
-            }else if (screen.raw.includes("was released")) {
-                const textContent = await page.getByText(/Pick wave \d+ was released/).textContent();
-               pickWaveId1 = await extractRequisition(textContent);
-                 expect(textContent).toMatch(/Pick wave \d+ was released. Number of pick slips: 1 and number of picks: 1./);
-                console.log(`****** Pick wave ID1: ${pickWaveId1} ******`);
-            } else if (screen.raw.includes("Sales order")) {
-                const salesOrderIDMsg = await page.getByText(/Sales order \d+ was/).textContent();
-                salesOrderId = await extractRequisition(salesOrderIDMsg);
-                console.log(`****** Sales Order ID: ${salesOrderId} ******`);
-            } else if (screen.raw.includes("The shipment")) {
-                const shippmentMsg = await page.getByText(/The shipment \d+ was confirmed./).textContent();
-                shipmentId = await extractRequisition(shippmentMsg);
-                console.log(`****** The shipment ID: ${shipmentId} ******`);
-            }else if (screen.raw.includes("Process")) {
-                const processIdMsg = await page.getByText(/Process \d+ was submitted./).textContent();
-                processId = await extractRequisition(processIdMsg);
-                console.log(`The process ID: ${processId}`);
-            }else if (screen.raw.includes("Shipped")) {
-                const orderStatus = await page.getByText('Shipped').textContent();
-                expect(orderStatus).toEqual("Shipped");
-                console.log(`Order Status: ${orderStatus}`);
-             } else {
-              await element.nth(0).click();
-              await page.waitForTimeout(1000);
-            }
-        } else if (screen.raw.includes("Order Management")) {
-            console.log(`Clicking on element: ${await element.nth(0).isVisible()}`);
-            await selectTabByPageIndex(page, "Order Management", element.nth(0));
-        } else {
-          // await element.nth(0).scrollIntoViewIfNeeded();
-          await element.nth(0).hover();
+          if (screen.raw.includes("Requisition")) {
+            const textContent = await element.nth(0).textContent();
+            requisitionId = await extractRequisition(textContent);
+            console.log(`Requisition ID: ${requisitionId}`);
+          } else if (screen.raw.includes("Purchase Orders")) {
+            const textContent = await element.nth(0).textContent();
+            purchaseOrderId = await extractRequisition(textContent);
+            console.log(`****** Purchase Order ID: ${purchaseOrderId} ******`);
+          } else if (screen.raw.includes("was released")) {
+            const textContent = await page
+              .getByText(/Pick wave \d+ was released/)
+              .textContent();
+            pickWaveId1 = await extractRequisition(textContent);
+            expect(textContent).toMatch(
+              /Pick wave \d+ was released. Number of pick slips: 1 and number of picks: 1./
+            );
+            console.log(`****** Pick wave ID1: ${pickWaveId1} ******`);
+          } else if (screen.raw.includes("Sales order")) {
+            const salesOrderIDMsg = await page
+              .getByText(/Sales order \d+ was/)
+              .textContent();
+            salesOrderId = await extractRequisition(salesOrderIDMsg);
+            console.log(`****** Sales Order ID: ${salesOrderId} ******`);
+          } else if (screen.raw.includes("The shipment")) {
+            const shippmentMsg = await page
+              .getByText(/The shipment \d+ was confirmed./)
+              .textContent();
+            shipmentId = await extractRequisition(shippmentMsg);
+            console.log(`****** The shipment ID: ${shipmentId} ******`);
+          } else if (screen.raw.includes("Process")) {
+            const processIdMsg = await page
+              .getByText(/Process \d+ was submitted./)
+              .textContent();
+            processId = await extractRequisition(processIdMsg);
+            console.log(`The process ID: ${processId}`);
+          } else if (screen.raw.includes("Shipped")) {
+            const orderStatus = await page.getByText("Shipped").textContent();
+            expect(orderStatus).toEqual("Shipped");
+            console.log(`Order Status: ${orderStatus}`);
+          } else {
             await element.nth(0).click();
             await page.waitForTimeout(1000);
+          }
+        } else if (screen.raw.includes("Order Management")) {
+          console.log(
+            `Clicking on element: ${await element.nth(0).isVisible()}`
+          );
+          await selectTabByPageIndex(page, "Order Management", element.nth(0));
+        } else {
+          // await element.nth(0).scrollIntoViewIfNeeded();
+          await page.waitForTimeout(1000);
+          await element.nth(0).hover();
+          await element.nth(0).click();
+          await page.waitForTimeout(1000);
         }
         break;
       case "press":
@@ -149,29 +188,31 @@ async function performActions(page: Page, screen: Action, screenName: string): P
 
       case "fill":
         const fillValue = screen.value?.replace(/^'(.*)'$/, "$1");
-            await element.nth(0).fill(fillValue);
-            if (screen.raw.includes("From Shipment") || screen.raw.includes("To Shipment")) {
-                element.nth(0).fill(shipmentId);
-            }
-
+        await element.nth(0).fill(fillValue);
+        if (
+          screen.raw.includes("From Shipment") ||
+          screen.raw.includes("To Shipment")
+        ) {
+          element.nth(0).fill(shipmentId);
+        }
 
         if (screen.raw.includes("combobox")) {
           await executeCopyPaste(element.nth(0), page);
-            }
+        }
 
-            if (screen.raw.includes("Manage Shipment Interface")) {
-                await element.nth(0).click();
-                await page.waitForTimeout(3000);
-              }
+        if (screen.raw.includes("Manage Shipment Interface")) {
+          await element.nth(0).click();
+          await page.waitForTimeout(3000);
+        }
 
         if (screen.raw.includes("Requisition")) {
           await element.nth(0).fill(requisitionId);
         }
 
         if (screen.raw.includes("Order")) {
-            await element.nth(0).fill(`${salesOrderId}`);
-            await element.nth(0).press("Tab");
-            await page.waitForTimeout(2000)
+          await element.nth(0).fill(`${salesOrderId}`);
+          await element.nth(0).press("Tab");
+          await page.waitForTimeout(2000);
         }
         break;
 
@@ -183,7 +224,11 @@ async function performActions(page: Page, screen: Action, screenName: string): P
         break;
 
       case "expect":
-        await handleDynamicAssertion(element.nth(0), screen.assertionType, screen.parsedValue);
+        await handleDynamicAssertion(
+          element.nth(0),
+          screen.assertionType,
+          screen.parsedValue
+        );
         break;
 
       default:
@@ -372,12 +417,29 @@ function peformAction(action: string, element: Locator, value: string) {
 }
 
 async function waitUntilOrderStatusChange(page: Page, element: Locator) {
-  while (!(await page.getByRole("cell", { name: "Awaiting Shipping", exact: true }).isVisible())
-    && !(await page.getByRole("cell", { name: "Shipped", exact: true }).isVisible())) {
-  await element.click();
-  await page.waitForTimeout(3000);
-}
-//   console.log("Order status changed to Awaiting Shipping.");
+  while (true) {
+    const awaitingShippingVisible = await page.getByRole("cell", { name: "Awaiting Shipping", exact: true }).isVisible();
+    const shippedVisible = await page.getByRole("cell", { name: "Shipped", exact: true }).isVisible();
+ 
+    if (awaitingShippingVisible) {
+      console.log("Awaiting Shipping is visible. Clicking...");
+      await page.getByRole("cell", { name: "Awaiting Shipping", exact: true }).click();
+      break;
+    }
+ 
+    if (shippedVisible) {
+      console.log("Shipped is visible. Clicking...");
+      await page.getByRole("cell", { name: "Shipped", exact: true }).click();
+      break;
+    }
+ 
+    // Retry after a short delay
+    console.log("Neither 'Awaiting Shipping' nor 'Shipped' is visible. Retrying...");
+    await element.click(); // Trigger any necessary action to refresh the status
+    await page.waitForTimeout(3000);
+  }
+ 
+  console.log("Order status changed to 'Awaiting Shipping' or 'Shipped'.");
 }
 
 async function selectTabByPageIndex(
