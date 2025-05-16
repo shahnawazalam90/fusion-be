@@ -5,11 +5,13 @@ const processManager = require('../utils/ProcessManager');
 const playwrightManager = require('../utils/PlaywrightManager');
 const path = require('path');
 const fs = require('fs');
+const { sendEmail } = require('../utils/emailUtil'); // Add email utility import
 
 class ReportService {
-  constructor(reportRepository, scenarioRepository) {
+  constructor(reportRepository, scenarioRepository, userRepository) {
     this.reportRepository = reportRepository;
     this.scenarioRepository = scenarioRepository;
+    this.userRepository = userRepository; // Add userRepository
   }
 
   async createReport(reportData) {
@@ -202,7 +204,32 @@ class ReportService {
     }
 
     await this.reportRepository.updateStatus(reportId, status, executedAt);
-    return this.reportRepository.findById(reportId);
+    const updatedReport = await this.reportRepository.findById(reportId);
+
+    if (status === 'completed' || status === 'failed') {
+      // Fetch user email
+      const user = await this.userRepository.findById(updatedReport.userId); // Use userRepository directly
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Fetch scenario names
+      const scenarioIds = updatedReport.scenarioIds;
+      const scenarios = await Promise.all(
+        scenarioIds.map((id) => this.scenarioRepository.findById(id))
+      );
+      const scenarioNames = scenarios.map((scenario) => scenario.name).join(', ');
+
+      // Send email
+      const emailBody = `The report you've executed for ${scenarioNames} is complete.`;
+      try {
+        await sendEmail(user.email, 'Report Execution Complete', emailBody);
+      } catch (err) {
+        console.log('Error send mail: ', err);
+      }
+    }
+
+    return updatedReport;
   }
 
   async updateReportFilePath(reportId, filePath) {

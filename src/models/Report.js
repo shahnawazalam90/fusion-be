@@ -41,6 +41,11 @@ module.exports = (sequelize) => {
       allowNull: true,
       defaultValue: DataTypes.NOW,
     },
+    scheduled: {
+      type: DataTypes.TIME,
+      allowNull: true,
+      comment: 'Optional scheduled time for the report',
+    },
     createdAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
