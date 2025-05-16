@@ -9,9 +9,19 @@ const {
 class AuthService {
   constructor(userRepository) {
     this.userRepository = userRepository;
+    this.tenantModel = userRepository.Tenant;
   }
 
   async register(userData) {
+    if (!userData.tenantId) {
+      throw new BadRequestError('Tenant ID is required');
+    }
+
+    const tenantExists = await this.tenantModel.findByPk(userData.tenantId);
+    if (!tenantExists) {
+      throw new BadRequestError('Invalid Tenant ID');
+    }
+
     const existingUser = await this.userRepository.findByEmail(userData.email);
 
     if (existingUser) {
@@ -68,6 +78,13 @@ class AuthService {
   }
 
   async updateProfile(userId, userData) {
+    if (userData.tenantId) {
+      const tenantExists = await this.userRepository.models.Tenant.findById(userData.tenantId);
+      if (!tenantExists) {
+        throw new BadRequestError('Invalid Tenant ID');
+      }
+    }
+
     // Do not allow password update through this method
     if (userData.password) {
       delete userData.password;

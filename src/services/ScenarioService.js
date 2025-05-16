@@ -29,15 +29,25 @@ class ScenarioService {
     return deleted;
   }
 
-  async updateScenario(id, jsonMetaData) {
+  async updateScenario(id, updates) {
     const scenario = await this.scenarioRepository.findById(id);
     if (!scenario) {
       throw new NotFoundError('Scenario not found');
     }
 
-    scenario.jsonMetaData = jsonMetaData;
-    await scenario.save();
+    const { jsonMetaData, name, url } = updates;
 
+    if (jsonMetaData !== undefined) {
+      scenario.jsonMetaData = jsonMetaData;
+    }
+    if (name !== undefined) {
+      scenario.name = name;
+    }
+    if (url !== undefined) {
+      scenario.url = url;
+    }
+
+    await scenario.save();
     return scenario;
   }
 }
