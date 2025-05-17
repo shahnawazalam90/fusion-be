@@ -7,6 +7,7 @@ const validateRegister = (req, res, next) => {
     password: Joi.string().min(6).required(),
     firstName: Joi.string().allow('', null),
     lastName: Joi.string().allow('', null),
+    tenantId: Joi.string().uuid().required(), // Added tenantId as an optional field
   });
 
   const { error } = schema.validate(req.body);

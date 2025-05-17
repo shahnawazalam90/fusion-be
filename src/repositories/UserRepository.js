@@ -1,6 +1,7 @@
 class UserRepository {
   constructor(models) {
     this.User = models.User;
+    this.Tenant = models.Tenant;
   }
 
   async findByEmail(email) {
@@ -20,6 +21,10 @@ class UserRepository {
     if (!user) return null;
 
     return user.update(userData);
+  }
+
+  getUserModel() {
+    return this.User;
   }
 }
 

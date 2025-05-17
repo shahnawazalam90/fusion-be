@@ -37,16 +37,17 @@ class ScenarioController {
   });
 
   updateScenario = catchAsync(async (req, res) => {
-    const { id, jsonMetaData } = req.body;
+    const { id, jsonMetaData, name, url } = req.body;
 
-    if (!id || !jsonMetaData) {
+    if (!id) {
       return res.status(400).json({
         status: 'error',
-        message: 'Scenario ID and jsonMetaData are required',
+        message: 'Scenario ID is required',
       });
     }
 
-    const updatedScenario = await this.scenarioService.updateScenario(id, jsonMetaData);
+    const updates = { jsonMetaData, name, url };
+    const updatedScenario = await this.scenarioService.updateScenario(id, updates);
 
     res.status(200).json({
       status: 'success',

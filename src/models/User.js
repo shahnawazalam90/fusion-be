@@ -38,6 +38,10 @@ module.exports = (sequelize) => {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
       },
+      tenantId: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
     },
     {
       hooks: {
