@@ -18,9 +18,11 @@
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.2",
     "mysql2": "^3.14.1",
+    "node-cron": "^4.0.5",
     "nodemailer": "^7.0.3",
     "sequelize": "^6.35.1",
     "unzipper": "^0.12.3",
+    "uuid": "^11.1.0",
     "winston": "^3.11.0"
   },
   "devDependencies": {
