@@ -4,36 +4,48 @@ class ScheduleRepository {
   }
 
   async create(scheduleData) {
-    const schedule = new this.Schedule(scheduleData);
-    return schedule.save();
+    return this.Schedule.create(scheduleData);
   }
 
   async findById(id) {
-    return this.Schedule.findById(id);
+    return this.Schedule.findByPk(id);
   }
 
   async findAll() {
-    return this.Schedule.find();
+    return this.Schedule.findAll();
   }
 
   async findActive() {
-    return this.Schedule.find({ isActive: true });
+    return this.Schedule.findAll({
+      where: { isActive: true }
+    });
   }
 
   async update(id, updateData) {
-    return this.Schedule.findByIdAndUpdate(
-      id,
-      { $set: updateData },
-      { new: true }
+    const [updatedCount, [updatedSchedule]] = await this.Schedule.update(
+      updateData,
+      {
+        where: { id },
+        returning: true
+      }
     );
+    return updatedSchedule;
   }
 
   async delete(id) {
-    return this.Schedule.findByIdAndDelete(id);
+    return this.Schedule.destroy({
+      where: { id }
+    });
   }
 
   async findByScenarioId(scenarioId) {
-    return this.Schedule.find({ scenarioId });
+    return this.Schedule.findAll({
+      where: {
+        scenarioIds: {
+          [this.Schedule.sequelize.Op.like]: `%${scenarioId}%`
+        }
+      }
+    });
   }
 }
 
