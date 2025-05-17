@@ -7,21 +7,33 @@ class ScheduleController {
     try {
       const scheduleData = {
         ...req.body,
-        createdBy: req.user._id
+        createdBy: req.user.id
       };
       const schedule = await this.scheduleService.createSchedule(scheduleData);
-      res.status(201).json(schedule);
+      res.status(201).json({
+        success: true,
+        data: schedule
+      });
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
     }
   };
 
   getAllSchedules = async (req, res) => {
     try {
       const schedules = await this.scheduleService.getAllSchedules();
-      res.json(schedules);
+      res.json({
+        success: true,
+        data: schedules
+      });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
     }
   };
 
@@ -29,20 +41,35 @@ class ScheduleController {
     try {
       const schedule = await this.scheduleService.getSchedule(req.params.id);
       if (!schedule) {
-        return res.status(404).json({ error: 'Schedule not found' });
+        return res.status(404).json({
+          success: false,
+          error: 'Schedule not found'
+        });
       }
-      res.json(schedule);
+      res.json({
+        success: true,
+        data: schedule
+      });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
     }
   };
 
   updateSchedule = async (req, res) => {
     try {
       const schedule = await this.scheduleService.updateSchedule(req.params.id, req.body);
-      res.json(schedule);
+      res.json({
+        success: true,
+        data: schedule
+      });
     } catch (error) {
-      res.status(400).json({ error: error.message });
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
     }
   };
 
@@ -51,16 +78,25 @@ class ScheduleController {
       await this.scheduleService.deleteSchedule(req.params.id);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
     }
   };
 
   getSchedulesByScenario = async (req, res) => {
     try {
       const schedules = await this.scheduleService.getSchedulesByScenario(req.params.scenarioId);
-      res.json(schedules);
+      res.json({
+        success: true,
+        data: schedules
+      });
     } catch (error) {
-      res.status(500).json({ error: error.message });
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
     }
   };
 }

@@ -1,4 +1,3 @@
-const cron = require('node-cron');
 const { v4: uuidv4 } = require('uuid');
 const PlaywrightManager = require('../utils/PlaywrightManager');
 
@@ -23,57 +22,62 @@ class ScheduleService {
 
   async scheduleJob(schedule) {
     try {
-      if (!cron.validate(schedule.cronExpression)) {
-        throw new Error('Invalid cron expression');
+      const now = new Date();
+      const scheduleTime = new Date(schedule.scheduleTime);
+
+      // If schedule time is in the past, don't schedule it
+      if (scheduleTime <= now) {
+        console.log(`Schedule ${schedule.name} is in the past, skipping`);
+        return;
       }
 
-      const job = cron.schedule(schedule.cronExpression, async () => {
+      // Calculate delay until schedule time
+      const delay = scheduleTime.getTime() - now.getTime();
+
+      // Create timeout for the schedule
+      const timeoutId = setTimeout(async () => {
         try {
           console.log(`Executing scheduled job: ${schedule.name} at ${new Date().toISOString()}`);
           
-          const reportId = uuidv4();
-          await PlaywrightManager.executeTest({
-            reportId,
-            dataFile: schedule.scenarioId.toString()
-          });
+          // Execute each scenario in the schedule
+          const scenarioIds = schedule.scenarioIds;
+          for (const scenarioId of scenarioIds) {
+            const reportId = uuidv4();
+            await PlaywrightManager.executeTest({
+              reportId,
+              dataFile: scenarioId.toString()
+            });
+          }
 
-          schedule.lastRun = new Date();
-          schedule.nextRun = this.calculateNextRun(schedule.cronExpression);
-          await this.scheduleRepository.update(schedule._id, {
-            lastRun: schedule.lastRun,
-            nextRun: schedule.nextRun
+          // Update last run time and deactivate
+          await this.scheduleRepository.update(schedule.id, {
+            lastRun: new Date(),
+            isActive: false
           });
 
         } catch (error) {
           console.error(`Error executing scheduled job ${schedule.name}:`, error);
         }
-      }, {
-        scheduled: true,
-        timezone: schedule.timezone,
-        recoverMissedExecutions: false
-      });
+      }, delay);
 
-      this.jobs.set(schedule._id.toString(), job);
+      // Store the timeout
+      this.jobs.set(schedule.id, timeoutId);
       
-      schedule.nextRun = this.calculateNextRun(schedule.cronExpression);
-      await this.scheduleRepository.update(schedule._id, { nextRun: schedule.nextRun });
+      console.log(`Scheduled job ${schedule.name} to run at ${schedule.scheduleTime}`);
 
-      console.log(`Scheduled job ${schedule.name} to run at ${schedule.nextRun}`);
-
-      return job;
+      return timeoutId;
     } catch (error) {
       console.error(`Error scheduling job ${schedule.name}:`, error);
       throw error;
     }
   }
 
-  calculateNextRun(cronExpression) {
-    const nextDate = cron.schedule(cronExpression).nextDate();
-    return nextDate.toDate();
-  }
-
   async createSchedule(scheduleData) {
     try {
+      // Convert schedule time to UTC
+      const scheduleTime = new Date(scheduleData.scheduleTime);
+      scheduleData.scheduleTime = scheduleTime;
+
       const schedule = await this.scheduleRepository.create(scheduleData);
       if (schedule.isActive) {
         await this.scheduleJob(schedule);
@@ -92,9 +96,15 @@ class ScheduleService {
         throw new Error('Schedule not found');
       }
 
+      // Clear existing timeout if it exists
       if (this.jobs.has(scheduleId)) {
-        this.jobs.get(scheduleId).stop();
+        clearTimeout(this.jobs.get(scheduleId));
         this.jobs.delete(scheduleId);
+      }
+
+      // Convert schedule time to UTC if it's being updated
+      if (updateData.scheduleTime) {
+        updateData.scheduleTime = new Date(updateData.scheduleTime);
       }
 
       const updatedSchedule = await this.scheduleRepository.update(scheduleId, updateData);
@@ -117,8 +127,9 @@ class ScheduleService {
         throw new Error('Schedule not found');
       }
 
+      // Clear timeout if it exists
       if (this.jobs.has(scheduleId)) {
-        this.jobs.get(scheduleId).stop();
+        clearTimeout(this.jobs.get(scheduleId));
         this.jobs.delete(scheduleId);
       }
 
