@@ -1,6 +1,7 @@
 class ScheduleRepository {
   constructor(models) {
     this.Schedule = models.Schedule;
+    this.models = models;
   }
 
   async create(scheduleData) {
@@ -8,16 +9,33 @@ class ScheduleRepository {
   }
 
   async findById(id) {
-    return this.Schedule.findByPk(id);
+    return this.Schedule.findByPk(id, {
+      include: [{
+        model: this.models.User,
+        as: 'creator',
+        attributes: ['id', 'email', 'firstName', 'lastName']
+      }]
+    });
   }
 
   async findAll() {
-    return this.Schedule.findAll();
+    return this.Schedule.findAll({
+      include: [{
+        model: this.models.User,
+        as: 'creator',
+        attributes: ['id', 'email', 'firstName', 'lastName']
+      }]
+    });
   }
 
   async findActive() {
     return this.Schedule.findAll({
-      where: { isActive: true }
+      where: { isActive: true },
+      include: [{
+        model: this.models.User,
+        as: 'creator',
+        attributes: ['id', 'email', 'firstName', 'lastName']
+      }]
     });
   }
 
@@ -44,7 +62,12 @@ class ScheduleRepository {
         scenarioIds: {
           [this.Schedule.sequelize.Op.like]: `%${scenarioId}%`
         }
-      }
+      },
+      include: [{
+        model: this.models.User,
+        as: 'creator',
+        attributes: ['id', 'email', 'firstName', 'lastName']
+      }]
     });
   }
 }

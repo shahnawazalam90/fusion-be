@@ -48,5 +48,13 @@ module.exports = (sequelize) => {
     }
   });
 
+  // Define associations
+  Schedule.associate = (models) => {
+    Schedule.belongsTo(models.User, {
+      foreignKey: 'createdBy',
+      as: 'creator'
+    });
+  };
+
   return Schedule;
 }; 

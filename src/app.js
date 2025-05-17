@@ -36,6 +36,13 @@ const TenantController = require('./api/v1/controllers/TenantController');
 const createApp = async (models) => {
   const app = express();
 
+  // Initialize model associations
+  Object.keys(models).forEach(modelName => {
+    if (models[modelName].associate) {
+      models[modelName].associate(models);
+    }
+  });
+
   // Middleware
   app.use(cors());
   app.use(express.json());
