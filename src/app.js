@@ -77,7 +77,7 @@ const createApp = async (models) => {
   const scenarioService = new ScenarioService(scenarioRepository);
   const reportService = new ReportService(reportRepository, scenarioRepository, userRepository);
   const specFileService = new SpecFileService(specFileRepository);
-  const scheduleService = new ScheduleService(scheduleRepository);
+  const scheduleService = new ScheduleService(scheduleRepository, reportService);
   const tenantService = new TenantService(tenantRepository);
 
   // Initialize controllers

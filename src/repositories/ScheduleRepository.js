@@ -40,14 +40,10 @@ class ScheduleRepository {
   }
 
   async update(id, updateData) {
-    const [updatedCount, [updatedSchedule]] = await this.Schedule.update(
-      updateData,
-      {
-        where: { id },
-        returning: true
-      }
-    );
-    return updatedSchedule;
+    await this.Schedule.update(updateData, {
+      where: { id }
+    });
+    return this.findById(id);
   }
 
   async delete(id) {

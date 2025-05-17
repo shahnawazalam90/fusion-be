@@ -1,9 +1,13 @@
 const { v4: uuidv4 } = require('uuid');
 const PlaywrightManager = require('../utils/PlaywrightManager');
+const ReportService = require('./ReportService');
+const path = require('path');
+const fs = require('fs');
 
 class ScheduleService {
-  constructor(scheduleRepository) {
+  constructor(scheduleRepository, reportService) {
     this.scheduleRepository = scheduleRepository;
+    this.reportService = reportService;
     this.jobs = new Map();
     this.initializeScheduler();
   }
@@ -39,15 +43,37 @@ class ScheduleService {
         try {
           console.log(`Executing scheduled job: ${schedule.name} at ${new Date().toISOString()}`);
           
-          // Execute each scenario in the schedule
-          const scenarioIds = schedule.scenarioIds;
-          for (const scenarioId of scenarioIds) {
-            const reportId = uuidv4();
-            await PlaywrightManager.executeTest({
-              reportId,
-              dataFile: scenarioId.toString()
-            });
+          // Create report with all scenarios
+          const reportId = uuidv4();
+          const report = await this.reportService.createReport({
+            id: reportId,
+            userId: schedule.createdBy,
+            scenarioIds: schedule.scenarioIds,
+            status: 'pending'
+          });
+
+          if (!report) {
+            throw new Error('Failed to create report');
           }
+
+          // Generate and save scenario metadata
+          const scenarioFilePath = await this.reportService.saveScenarioMetadata(report.id);
+          if (!scenarioFilePath) {
+            throw new Error('Failed to save scenario metadata');
+          }
+
+          // Ensure the scenarios directory exists
+          const scenariosDir = path.join(process.cwd(), 'uploads', 'scenarios');
+          if (!fs.existsSync(scenariosDir)) {
+            fs.mkdirSync(scenariosDir, { recursive: true });
+          }
+
+          // Copy the scenario file to the correct location
+          const targetPath = path.join(scenariosDir, path.basename(scenarioFilePath));
+          fs.copyFileSync(scenarioFilePath, targetPath);
+
+          // Execute Playwright test
+          await this.reportService.executePlaywrightTest(report.id, path.basename(targetPath));
 
           // Update last run time and deactivate
           await this.scheduleRepository.update(schedule.id, {

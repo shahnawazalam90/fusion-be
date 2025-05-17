@@ -39,6 +39,7 @@ class ReportController {
     const { scenarioIds, status = 'pending' } = req.body;
 
     const reportData = {
+    
       userId: req.userId,
       scenarioIds: this.getProcessedScenarioIds(scenarioIds),
       status
