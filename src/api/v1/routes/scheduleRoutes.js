@@ -1,26 +1,26 @@
 const express = require('express');
-const auth = require('../../../middleware/auth');
+const { authenticateUser } = require('../../../middlewares/auth');
 
 module.exports = (scheduleController) => {
   const router = express.Router();
 
   // Create a new schedule
-  router.post('/', auth, scheduleController.createSchedule);
+  router.post('/', authenticateUser, scheduleController.createSchedule);
 
   // Get all schedules
-  router.get('/', auth, scheduleController.getAllSchedules);
+  router.get('/', authenticateUser, scheduleController.getAllSchedules);
 
   // Get a specific schedule
-  router.get('/:id', auth, scheduleController.getSchedule);
+  router.get('/:id', authenticateUser, scheduleController.getSchedule);
 
   // Update a schedule
-  router.put('/:id', auth, scheduleController.updateSchedule);
+  router.put('/:id', authenticateUser, scheduleController.updateSchedule);
 
   // Delete a schedule
-  router.delete('/:id', auth, scheduleController.deleteSchedule);
+  router.delete('/:id', authenticateUser, scheduleController.deleteSchedule);
 
   // Get schedules by scenario
-  router.get('/scenario/:scenarioId', auth, scheduleController.getSchedulesByScenario);
+  router.get('/scenario/:scenarioId', authenticateUser, scheduleController.getSchedulesByScenario);
 
   return router;
-}; 
+};

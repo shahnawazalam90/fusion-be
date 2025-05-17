@@ -7,7 +7,7 @@ class ScheduleController {
     try {
       const scheduleData = {
         ...req.body,
-        createdBy: req.user.id
+        createdBy: req.userId
       };
       const schedule = await this.scheduleService.createSchedule(scheduleData);
       res.status(201).json({
