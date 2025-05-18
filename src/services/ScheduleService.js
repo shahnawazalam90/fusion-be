@@ -100,6 +100,30 @@ class ScheduleService {
 
   async createSchedule(scheduleData) {
     try {
+      // Ensure scenarioIds is an array
+      if (typeof scheduleData.scenarioIds === 'string') {
+        try {
+          // Try to parse as JSON array
+          const parsed = JSON.parse(scheduleData.scenarioIds);
+          if (Array.isArray(parsed)) {
+            scheduleData.scenarioIds = parsed;
+          } else {
+            // Try to split by comma if not a JSON array
+            scheduleData.scenarioIds = scheduleData.scenarioIds.split(',').map(s => s.trim()).filter(Boolean);
+          }
+        } catch (e) {
+          // Try to split by comma if JSON.parse fails
+          if (scheduleData.scenarioIds.includes(',')) {
+            scheduleData.scenarioIds = scheduleData.scenarioIds.split(',').map(s => s.trim()).filter(Boolean);
+          } else {
+            throw new Error('scenarioIds must be an array or a comma-separated string');
+          }
+        }
+      }
+      if (!Array.isArray(scheduleData.scenarioIds)) {
+        throw new Error('scenarioIds must be an array');
+      }
+
       // Convert schedule time to UTC
       const scheduleTime = new Date(scheduleData.scheduleTime);
       scheduleData.scheduleTime = scheduleTime;
@@ -179,4 +203,4 @@ class ScheduleService {
   }
 }
 
-module.exports = ScheduleService; 
+module.exports = ScheduleService;
