@@ -35,15 +35,15 @@ module.exports = (sequelize) => {
       type: DataTypes.UUID,
       allowNull: false,
     },
-    scenarioIds: {
+    scenarios: {
       type: DataTypes.TEXT,
       allowNull: false,
       get() {
-        const rawValue = this.getDataValue('scenarioIds');
+        const rawValue = this.getDataValue('scenarios');
         return rawValue ? JSON.parse(rawValue) : [];
       },
       set(value) {
-        this.setDataValue('scenarioIds', JSON.stringify(value));
+        this.setDataValue('scenarios', JSON.stringify(value));
       }
     }
   });
@@ -57,4 +57,4 @@ module.exports = (sequelize) => {
   };
 
   return Schedule;
-}; 
+};

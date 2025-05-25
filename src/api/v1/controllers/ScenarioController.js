@@ -10,6 +10,7 @@ class ScenarioController {
 
   createScenario = catchAsync(async (req, res) => {
     const scenarioData = { ...req.body, userId: req.userId };
+    // Accept dataExcel and dataManual from req.body
     const scenario = await this.scenarioService.createScenario(scenarioData);
 
     res.status(201).json({
@@ -37,7 +38,7 @@ class ScenarioController {
   });
 
   updateScenario = catchAsync(async (req, res) => {
-    const { id, jsonMetaData, name, url } = req.body;
+    const { id, jsonMetaData, name, url, dataExcel, dataManual } = req.body;
 
     if (!id) {
       return res.status(400).json({
@@ -46,7 +47,7 @@ class ScenarioController {
       });
     }
 
-    const updates = { jsonMetaData, name, url };
+    const updates = { jsonMetaData, name, url, dataExcel, dataManual };
     const updatedScenario = await this.scenarioService.updateScenario(id, updates);
 
     res.status(200).json({

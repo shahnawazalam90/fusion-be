@@ -53,9 +53,10 @@ class ScheduleRepository {
   }
 
   async findByScenarioId(scenarioId) {
+    // Find schedules where scenarios contains an object with scenarioId
     return this.Schedule.findAll({
       where: {
-        scenarioIds: {
+        scenarios: {
           [this.Schedule.sequelize.Op.like]: `%${scenarioId}%`
         }
       },
@@ -68,4 +69,4 @@ class ScheduleRepository {
   }
 }
 
-module.exports = ScheduleRepository; 
+module.exports = ScheduleRepository;

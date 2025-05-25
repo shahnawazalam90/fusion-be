@@ -12,36 +12,48 @@ class ReportController {
     this.reportService = reportService;
   }
 
-  getProcessedScenarioIds = (scenarioIds, res) => {
-    // Handle both string and array formats for scenarioIds
-    let processedScenarioIds;
-    if (typeof scenarioIds === 'string') {
+  getProcessedScenarioIds = (scenarios) => {
+    // Accepts array of objects or JSON string
+    let processedScenarios;
+    if (typeof scenarios === 'string') {
       try {
-        // Try to parse as JSON array
-        processedScenarioIds = JSON.parse(scenarioIds);
+        processedScenarios = JSON.parse(scenarios);
       } catch (e) {
-        // If not valid JSON, treat as comma-separated string
-        processedScenarioIds = scenarioIds.split(',').map(id => id.trim());
+        throw new Error('scenarios must be provided as an array of objects or JSON string');
       }
-    } else if (Array.isArray(scenarioIds)) {
-      processedScenarioIds = scenarioIds;
+    } else if (Array.isArray(scenarios)) {
+      processedScenarios = scenarios;
     } else {
-      return res.status(400).json({
-        status: 'error',
-        message: 'scenarioIds must be provided as an array or comma-separated string',
-      });
+      throw new Error('scenarios must be provided as an array of objects or JSON string');
     }
 
-    return processedScenarioIds;
+    // Validate valuesType for each scenario
+    if (Array.isArray(processedScenarios)) {
+      for (const scenario of processedScenarios) {
+        if (!['excel', 'manual'].includes(scenario.valuesType)) {
+          throw new Error('valuesType must be either "excel" or "manual"');
+        }
+      }
+    }
+    return processedScenarios;
   };
 
   createReport = catchAsync(async (req, res) => {
-    const { scenarioIds, status = 'pending' } = req.body;
+    const { scenarios, status = 'pending' } = req.body;
+
+    let processedScenarios;
+    try {
+      processedScenarios = this.getProcessedScenarioIds(scenarios);
+    } catch (err) {
+      return res.status(400).json({
+        status: 'error',
+        message: err.message,
+      });
+    }
 
     const reportData = {
-    
       userId: req.userId,
-      scenarioIds: this.getProcessedScenarioIds(scenarioIds),
+      scenarios: processedScenarios,
       status
     };
 
@@ -270,17 +282,25 @@ class ReportController {
   }
 
   getReportJSON = catchAsync(async (req, res) => {
-    const { scenarioIds } = req.body;
+    const { scenarios } = req.body;
 
-    if (!scenarioIds) {
+    if (!scenarios) {
       return res.status(400).json({
         status: 'error',
-        message: 'scenarioIds are required',
+        message: 'scenarios are required',
       });
     }
 
-    const processedScenarioIds = this.getProcessedScenarioIds(scenarioIds, res);
-    const scenarioData = await this.reportService.getScenariosMetaData(processedScenarioIds);
+    let processedScenarios;
+    try {
+      processedScenarios = this.getProcessedScenarioIds(scenarios);
+    } catch (err) {
+      return res.status(400).json({
+        status: 'error',
+        message: err.message,
+      });
+    }
+    const scenarioData = await this.reportService.getScenariosMetaData(processedScenarios);
 
     res.status(200).json({
       status: 'success',

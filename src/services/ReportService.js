@@ -15,17 +15,33 @@ class ReportService {
   }
 
   async createReport(reportData) {
-    // Ensure scenarioIds is always an array
-    if (reportData.scenarioId && !reportData.scenarioIds) {
-      reportData.scenarioIds = Array.isArray(reportData.scenarioId)
-        ? reportData.scenarioId
-        : [reportData.scenarioId];
+    // Ensure scenarios is always an array of objects [{scenarioId, valuesType}]
+    if (reportData.scenarioId && !reportData.scenarios) {
+      reportData.scenarios = Array.isArray(reportData.scenarioId)
+        ? reportData.scenarioId.map(id => ({ scenarioId: id, valuesType: 'manual' }))
+        : [{ scenarioId: reportData.scenarioId, valuesType: 'manual' }];
       delete reportData.scenarioId;
     }
-
+    // If scenarios is a string, parse it
+    if (typeof reportData.scenarios === 'string') {
+      try {
+        reportData.scenarios = JSON.parse(reportData.scenarios);
+      } catch (e) {
+        throw new Error('scenarios must be an array of objects or a JSON string');
+      }
+    }
     // Set default status if not provided
     if (!reportData.status) {
       reportData.status = 'pending';
+    }
+
+    // Validate valuesType for each scenario
+    if (Array.isArray(reportData.scenarios)) {
+      for (const scenario of reportData.scenarios) {
+        if (!['excel', 'manual'].includes(scenario.valuesType)) {
+          throw new Error('valuesType must be either "excel" or "manual"');
+        }
+      }
     }
 
     return this.reportRepository.create(reportData);
@@ -49,22 +65,26 @@ class ReportService {
     }
   }
 
-  async getScenariosMetaData(scenarioIds) {
-    // Fetch all scenarios concurrently
-    const scenarios = await Promise.all(
+  async getScenariosMetaData(scenarios) {
+    // scenarios: [{ scenarioId, valuesType }]
+    const scenarioIds = scenarios.map(s => s.scenarioId);
+    const scenariosData = await Promise.all(
       scenarioIds.map((scenarioId) =>
         this.scenarioRepository.findById(scenarioId)
       )
     );
 
     // Process each scenario
-    const scenarioData = scenarios
+    const scenarioData = scenariosData
       .filter((scenario) => scenario) // Filter out null or undefined scenarios
       .map((scenario) => {
-        let jsonData;
+        const jsonData = [];
         try {
-          jsonData = JSON.parse(scenario.jsonMetaData);
-          jsonData = jsonData.map((screen) => {
+          const scenarioValuesType = scenarios.find(
+            (s) => s.scenarioId === scenario.id && s.valuesType
+          ).valuesType;
+
+          const jsonMetaData = JSON.parse(scenario.jsonMetaData).map((screen) => {
             let newScreen = { ...screen };
             newScreen['actions'] = screen.actions.map((action) => {
               const objectPattern = /(\{[^}]+\})/g;
@@ -81,18 +101,40 @@ class ReportService {
             });
             return newScreen;
           });
+
+          if (scenarioValuesType === 'manual') {
+            JSON.parse(scenario.dataManual).forEach(([id, value]) => {
+              const [i, j] = id.split(',').map(Number);
+
+              jsonMetaData[i].actions[j].value = value;
+            });
+
+            jsonData.push(jsonMetaData);
+          } else if (scenarioValuesType === 'excel') {
+            JSON.parse(scenario.dataExcel).forEach(([id, ...value]) => {
+              const [i, j] = id.split(',').map(Number);
+
+              value.forEach((val, index) => {
+                if (!jsonData[index]) {
+                  jsonData[index] = jsonMetaData;
+                }
+
+                jsonData[index][i].actions[j].value = val;
+              });
+            });
+          }
         } catch (e) {
           // If it's not valid JSON, use it as a string
           jsonData = scenario.jsonMetaData;
         }
 
-        return {
+        return jsonData.map((data) => ({
           id: scenario.id,
           scenario: scenario.name,
-          screens: jsonData,
+          screens: data,
           url: scenario.url,
-        };
-      });
+        }));
+      }).flat(1);
 
     return scenarioData;
   }
@@ -109,7 +151,7 @@ class ReportService {
       fs.mkdirSync(scenariosDir, { recursive: true });
     }
 
-    const scenarioData = await this.getScenariosMetaData(report.scenarioIds);
+    const scenarioData = await this.getScenariosMetaData(report.scenarios);
 
     // Generate a unique filename
     const timestamp = new Date().getTime();
@@ -155,7 +197,7 @@ class ReportService {
           // Get process status before updating report status
           const process = await this.getReportProcess(report.id);
           let newStatus = report.status;
-          
+
           if (process) {
             // If process exists, use its status
             newStatus = process.exitCode === 0 ? 'completed' : 'failed';
@@ -208,13 +250,12 @@ class ReportService {
 
     if (status === 'completed' || status === 'failed') {
       // Fetch user email
-      const user = await this.userRepository.findById(updatedReport.userId); // Use userRepository directly
+      const user = await this.userRepository.findById(updatedReport.userId);
       if (!user) {
         throw new Error('User not found');
       }
-
       // Fetch scenario names
-      const scenarioIds = updatedReport.scenarioIds;
+      const scenarioIds = updatedReport.scenarios.map(s => s.scenarioId);
       const scenarios = await Promise.all(
         scenarioIds.map((id) => this.scenarioRepository.findById(id))
       );
@@ -309,43 +350,41 @@ class ReportService {
     return processManager.getProcess(reportId);
   }
 
-  getProcessedScenarioIds = (scenarioIds, res) => {
-    // Handle both string and array formats for scenarioIds
-    let processedScenarioIds;
-    if (typeof scenarioIds === 'string') {
+  getProcessedScenarioIds = (scenarios, res) => {
+    // Accepts array of objects or JSON string
+    let processedScenarios;
+    if (typeof scenarios === 'string') {
       try {
-        // Try to parse as JSON array
-        processedScenarioIds = JSON.parse(scenarioIds);
+        processedScenarios = JSON.parse(scenarios);
       } catch (e) {
-        // If not valid JSON, treat as comma-separated string
-        processedScenarioIds = scenarioIds.split(',').map(id => id.trim());
+        return res.status(400).json({
+          status: 'error',
+          message: 'scenarios must be provided as an array of objects or JSON string',
+        });
       }
-    } else if (Array.isArray(scenarioIds)) {
-      processedScenarioIds = scenarioIds;
+    } else if (Array.isArray(scenarios)) {
+      processedScenarios = scenarios;
     } else {
       return res.status(400).json({
         status: 'error',
-        message: 'scenarioIds must be provided as an array or comma-separated string',
+        message: 'scenarios must be provided as an array of objects or JSON string',
       });
     }
-
-    return processedScenarioIds;
+    return processedScenarios;
   };
 
   getReportJSON = async (req, res) => {
-    const { scenarioIds } = req.body;
+    const { scenarios } = req.body;
 
-    if (!scenarioIds) {
+    if (!scenarios) {
       return res.status(400).json({
         status: 'error',
-        message: 'scenarioIds are required',
+        message: 'scenarios are required',
       });
     }
 
-    const processedScenarioIds = this.getProcessedScenarioIds(scenarioIds, res);
-    const scenarioData = await this.reportService.getScenariosMetaData(
-      processedScenarioIds
-    );
+    const processedScenarios = this.getProcessedScenarioIds(scenarios, res);
+    const scenarioData = await this.getScenariosMetaData(processedScenarios);
 
     res.status(200).json({
       status: 'success',
