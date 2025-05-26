@@ -48,7 +48,7 @@ class ScheduleService {
           const report = await this.reportService.createReport({
             id: reportId,
             userId: schedule.createdBy,
-            scenarioIds: schedule.scenarioIds,
+            scenarios: schedule.scenarios,
             status: 'pending'
           });
 
@@ -100,28 +100,28 @@ class ScheduleService {
 
   async createSchedule(scheduleData) {
     try {
-      // Ensure scenarioIds is an array
-      if (typeof scheduleData.scenarioIds === 'string') {
+      // Ensure scenarios is an array of objects [{scenarioId, valuesType}]
+      if (typeof scheduleData.scenarios === 'string') {
         try {
-          // Try to parse as JSON array
-          const parsed = JSON.parse(scheduleData.scenarioIds);
+          const parsed = JSON.parse(scheduleData.scenarios);
           if (Array.isArray(parsed)) {
-            scheduleData.scenarioIds = parsed;
+            scheduleData.scenarios = parsed;
           } else {
-            // Try to split by comma if not a JSON array
-            scheduleData.scenarioIds = scheduleData.scenarioIds.split(',').map(s => s.trim()).filter(Boolean);
+            throw new Error('scenarios must be an array of objects');
           }
         } catch (e) {
-          // Try to split by comma if JSON.parse fails
-          if (scheduleData.scenarioIds.includes(',')) {
-            scheduleData.scenarioIds = scheduleData.scenarioIds.split(',').map(s => s.trim()).filter(Boolean);
-          } else {
-            throw new Error('scenarioIds must be an array or a comma-separated string');
-          }
+          throw new Error('scenarios must be an array of objects or a JSON string');
         }
       }
-      if (!Array.isArray(scheduleData.scenarioIds)) {
-        throw new Error('scenarioIds must be an array');
+      if (!Array.isArray(scheduleData.scenarios)) {
+        throw new Error('scenarios must be an array');
+      }
+
+      // Validate valuesType for each scenario
+      for (const scenario of scheduleData.scenarios) {
+        if (!['excel', 'manual'].includes(scenario.valuesType)) {
+          throw new Error('valuesType must be either "excel" or "manual"');
+        }
       }
 
       // Convert schedule time to UTC
@@ -155,6 +155,23 @@ class ScheduleService {
       // Convert schedule time to UTC if it's being updated
       if (updateData.scheduleTime) {
         updateData.scheduleTime = new Date(updateData.scheduleTime);
+      }
+
+      // Handle scenarios update
+      if (updateData.scenarios && typeof updateData.scenarios === 'string') {
+        try {
+          updateData.scenarios = JSON.parse(updateData.scenarios);
+        } catch (e) {
+          throw new Error('scenarios must be an array of objects or a JSON string');
+        }
+      }
+      // Validate valuesType for each scenario if scenarios are being updated
+      if (updateData.scenarios) {
+        for (const scenario of updateData.scenarios) {
+          if (!['excel', 'manual'].includes(scenario.valuesType)) {
+            throw new Error('valuesType must be either "excel" or "manual"');
+          }
+        }
       }
 
       const updatedSchedule = await this.scheduleRepository.update(scheduleId, updateData);

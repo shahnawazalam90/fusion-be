@@ -18,7 +18,7 @@ class ReportRepository {
   async findByScenarioId(scenarioId) {
     return this.Report.findAll({
       where: {
-        scenarioIds: { [this.Report.sequelize.Op.contains]: [scenarioId] }
+        scenarios: { [this.Report.sequelize.Op.like]: `%${scenarioId}%` }
       }
     });
   }

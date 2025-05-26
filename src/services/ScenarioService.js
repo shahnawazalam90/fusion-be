@@ -35,7 +35,7 @@ class ScenarioService {
       throw new NotFoundError('Scenario not found');
     }
 
-    const { jsonMetaData, name, url } = updates;
+    const { jsonMetaData, name, url, dataExcel, dataManual } = updates;
 
     if (jsonMetaData !== undefined) {
       scenario.jsonMetaData = jsonMetaData;
@@ -45,6 +45,12 @@ class ScenarioService {
     }
     if (url !== undefined) {
       scenario.url = url;
+    }
+    if (dataExcel !== undefined) {
+      scenario.dataExcel = dataExcel;
+    }
+    if (dataManual !== undefined) {
+      scenario.dataManual = dataManual;
     }
 
     await scenario.save();

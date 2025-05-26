@@ -19,6 +19,14 @@ module.exports = (sequelize) => {
       type: DataTypes.TEXT,
       allowNull: false,
     },
+    dataExcel: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    dataManual: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
     url: {
       type: DataTypes.STRING,
       allowNull: true,

@@ -43,6 +43,20 @@ const formatScenarioMetadata = (jsonMetaData) => {
 };
 
 /**
+ * Parses and formats scenario dataExcel or dataManual
+ * @param {string} data - The raw JSON string
+ * @returns {Object|string} - The formatted object or original string if parsing fails
+ */
+const formatScenarioData = (data) => {
+  if (!data) return null;
+  try {
+    return JSON.parse(data);
+  } catch (e) {
+    return data;
+  }
+};
+
+/**
  * Formats a complete scenario object with its metadata
  * @param {Object} scenario - The scenario object from the database
  * @returns {Object} - The formatted scenario object
@@ -53,6 +67,8 @@ const formatScenario = (scenario) => {
     name: scenario.name,
     url: scenario.url,
     metadata: formatScenarioMetadata(scenario.jsonMetaData),
+    dataExcel: formatScenarioData(scenario.dataExcel),
+    dataManual: formatScenarioData(scenario.dataManual),
     createdAt: scenario.createdAt,
     updatedAt: scenario.updatedAt
   };
@@ -73,4 +89,4 @@ module.exports = {
   formatScenarioMetadata,
   formatScenario,
   formatScenarios
-}; 
+};
