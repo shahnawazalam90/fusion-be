@@ -119,7 +119,7 @@ class ReportService {
                   jsonData[index] = JSON.parse(JSON.stringify(jsonMetaData));
                 }
 
-                jsonData[index][i].actions[j].value = val;
+                jsonData[index][i].actions[j].value = typeof val !== 'string' ? String(val) : val;
               });
             });
           }
