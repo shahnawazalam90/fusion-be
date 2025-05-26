@@ -116,7 +116,7 @@ class ReportService {
 
               value.forEach((val, index) => {
                 if (!jsonData[index]) {
-                  jsonData[index] = jsonMetaData;
+                  jsonData[index] = JSON.parse(JSON.stringify(jsonMetaData));
                 }
 
                 jsonData[index][i].actions[j].value = val;
