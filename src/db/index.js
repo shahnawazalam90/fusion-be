@@ -10,6 +10,7 @@ const ReportModel = require('../models/Report');
 const SpecFileModel = require('../models/SpecFile');
 const TenantModel = require('../models/Tenant');
 const ScheduleModel = require('../models/Schedule');
+const RequestModel = require('../models/Request');
 
 // Create Sequelize instance
 const sequelize = new Sequelize({
@@ -35,7 +36,8 @@ const models = {
   Report: ReportModel(sequelize),
   SpecFile: SpecFileModel(sequelize),
   Tenant: TenantModel(sequelize),
-  Schedule: ScheduleModel(sequelize)
+  Schedule: ScheduleModel(sequelize),
+  Request: RequestModel(sequelize)
 };
 
 // DB connection

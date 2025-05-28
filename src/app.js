@@ -13,6 +13,7 @@ const ReportRepository = require('./repositories/ReportRepository');
 const SpecFileRepository = require('./repositories/specFileRepository');
 const ScheduleRepository = require('./repositories/ScheduleRepository');
 const TenantRepository = require('./repositories/TenantRepository');
+const RequestRepository = require('./repositories/RequestRepository');
 
 // Services
 const AuthService = require('./services/AuthService');
@@ -22,6 +23,7 @@ const ReportService = require('./services/ReportService');
 const SpecFileService = require('./services/specFileService');
 const ScheduleService = require('./services/ScheduleService');
 const TenantService = require('./services/TenantService');
+const RequestService = require('./services/RequestService');
 
 // Controllers
 const AuthController = require('./api/v1/controllers/authController');
@@ -31,6 +33,7 @@ const ReportController = require('./api/v1/controllers/ReportController');
 const SpecFileController = require('./api/v1/controllers/SpecFileController');
 const ScheduleController = require('./api/v1/controllers/ScheduleController');
 const TenantController = require('./api/v1/controllers/TenantController');
+const RequestController = require('./api/v1/controllers/RequestController');
 
 // Create Express app
 const createApp = async (models) => {
@@ -70,6 +73,7 @@ const createApp = async (models) => {
   const specFileRepository = new SpecFileRepository(models);
   const scheduleRepository = new ScheduleRepository(models);
   const tenantRepository = new TenantRepository(models);
+  const requestRepository = new RequestRepository(models);
 
   // Initialize services
   const authService = new AuthService(userRepository);
@@ -79,6 +83,7 @@ const createApp = async (models) => {
   const specFileService = new SpecFileService(specFileRepository);
   const scheduleService = new ScheduleService(scheduleRepository, reportService);
   const tenantService = new TenantService(tenantRepository);
+  const requestService = new RequestService(requestRepository);
 
   // Initialize controllers
   const authController = new AuthController(authService);
@@ -88,6 +93,7 @@ const createApp = async (models) => {
   const specFileController = new SpecFileController(specFileService);
   const scheduleController = new ScheduleController(scheduleService);
   const tenantController = new TenantController(tenantService);
+  const requestController = new RequestController(requestService);
 
   // API routes
   app.use('/api/v1/auth', require('./api/v1/routes/authRoutes')(authController));
@@ -97,6 +103,7 @@ const createApp = async (models) => {
   app.use('/api/v1/specs', require('./api/v1/routes/specFileRoutes')(specFileController));
   app.use('/api/v1/schedules', require('./api/v1/routes/scheduleRoutes')(scheduleController));
   app.use('/api/v1/tenants', require('./api/v1/routes/tenantRoutes')(tenantController));
+  app.use('/api/v1/requests', require('./api/v1/routes/requestRoutes')(requestController));
 
   // Root route
   app.get('/', (req, res) => {

@@ -6,7 +6,12 @@ class ScenarioService {
   }
 
   async createScenario(scenarioData) {
-    return this.scenarioRepository.create(scenarioData);
+    // Only include requestId if present
+    const data = { ...scenarioData };
+    if (!('requestId' in scenarioData)) {
+      delete data.requestId;
+    }
+    return this.scenarioRepository.create(data);
   }
 
   async getScenarioById(id) {
@@ -35,7 +40,7 @@ class ScenarioService {
       throw new NotFoundError('Scenario not found');
     }
 
-    const { jsonMetaData, name, url, dataExcel, dataManual } = updates;
+    const { jsonMetaData, name, url, dataExcel, dataManual, requestId } = updates;
 
     if (jsonMetaData !== undefined) {
       scenario.jsonMetaData = jsonMetaData;
@@ -51,6 +56,9 @@ class ScenarioService {
     }
     if (dataManual !== undefined) {
       scenario.dataManual = dataManual;
+    }
+    if (requestId !== undefined) {
+      scenario.requestId = requestId;
     }
 
     await scenario.save();
