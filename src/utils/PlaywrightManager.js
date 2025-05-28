@@ -95,7 +95,7 @@ class PlaywrightManager {
    * @param {string} options.dataFile - Path to the data file
    * @returns {Promise<Object>} Process information
    */
-  async executeTest({ reportId, dataFile }) {
+  async executeTest({ reportId, dataFile, onStatusUpdate }) {
     return new Promise((resolve, reject) => {
       try {
         console.log('Starting Playwright process with file:', dataFile);
@@ -126,6 +126,7 @@ class PlaywrightManager {
 
         // Send initial status
         this.sendEvent(reportId, 'status', { status: 'running', ...processInfo });
+        if (onStatusUpdate) onStatusUpdate('running');
 
         // Handle stdout
         playwrightProcess.stdout.on('data', (data) => {
@@ -147,6 +148,7 @@ class PlaywrightManager {
           processManager.updateProcessStatus(reportId, false, -1);
           this.sendEvent(reportId, 'error', { error: error.message });
           this.sendEvent(reportId, 'status', { status: 'failed' });
+          if (onStatusUpdate) onStatusUpdate('failed');
           reject(error);
         });
 
@@ -156,6 +158,7 @@ class PlaywrightManager {
           processManager.updateProcessStatus(reportId, false, code);
           const status = code === 0 ? 'completed' : 'failed';
           this.sendEvent(reportId, 'status', { status, exitCode: code });
+          if (onStatusUpdate) onStatusUpdate(status);
           resolve(processInfo);
         });
 
@@ -165,6 +168,7 @@ class PlaywrightManager {
         processManager.updateProcessStatus(reportId, false, -1);
         this.sendEvent(reportId, 'error', { error: error.message });
         this.sendEvent(reportId, 'status', { status: 'failed' });
+        if (onStatusUpdate) onStatusUpdate('failed');
         reject(error);
       }
     });

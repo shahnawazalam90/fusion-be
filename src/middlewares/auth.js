@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const { config } = require('../config');
 const { UnauthorizedError } = require('../utils/errors');
+const { models } = require('../db'); // Import models to access User
 
 const authenticateUser = async (req, res, next) => {
   try {
@@ -20,6 +21,14 @@ const authenticateUser = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, config.jwtSecret);
     req.userId = decoded.id;
+
+    // Fetch user and attach to req.user (including tenantId)
+    const user = await models.User.findByPk(decoded.id);
+    if (!user) {
+      throw new UnauthorizedError('User not found');
+    }
+
+    req.tenantId = user.tenantId;
 
     next();
   } catch (error) {
