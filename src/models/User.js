@@ -54,6 +54,15 @@ module.exports = (sequelize) => {
           }
         },
       },
+      indexes: [
+        {
+          unique: true,
+          fields: ['email']
+        },
+        {
+          fields: ['tenantId']
+        }
+      ]
     }
   );
 

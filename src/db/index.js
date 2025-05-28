@@ -48,8 +48,20 @@ const connectDB = async () => {
 
     // Sync models with database in development (use migrations in production)
     if (config.nodeEnv === 'development') {
-      await sequelize.sync({ alter: true });
-      logger.info('Database synchronized');
+      try {
+        // Use alter: true to modify existing tables and add new ones without dropping data
+        await sequelize.sync({ alter: true });
+        logger.info('Database schema synchronized successfully');
+      } catch (syncError) {
+        if (syncError.original && syncError.original.code === 'ER_TOO_MANY_KEYS') {
+          logger.error('Too many indexes in the database. Please review and remove unnecessary indexes.');
+          // Continue without syncing to prevent application crash
+          logger.warn('Continuing without database sync. Please fix index issues manually.');
+        } else {
+          logger.error('Error during database sync:', syncError);
+          throw syncError;
+        }
+      }
     }
 
     return { sequelize, models };
