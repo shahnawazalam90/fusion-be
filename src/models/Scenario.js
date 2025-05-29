@@ -31,13 +31,6 @@ module.exports = (sequelize) => {
       type: DataTypes.STRING,
       allowNull: true,
     },
-    requestId: {
-      type: DataTypes.UUID, // Foreign key to Request.id
-      allowNull: true,
-      defaultValue: null,
-      // This field should reference the id of the Request model
-      // (add association in model setup if needed)
-    },
     createdAt: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
@@ -47,11 +40,6 @@ module.exports = (sequelize) => {
       defaultValue: DataTypes.NOW,
     },
   });
-
-  // Optionally, add association if models are associated elsewhere:
-  // Scenario.associate = (models) => {
-  //   Scenario.belongsTo(models.Request, { foreignKey: 'requestId', targetKey: 'id' });
-  // };
 
   return Scenario;
 };

@@ -45,6 +45,10 @@ module.exports = (sequelize) => {
       set(value) {
         this.setDataValue('scenarios', JSON.stringify(value));
       }
+    },
+    browser: {
+      type: DataTypes.STRING,
+      allowNull: true,
     }
   });
 

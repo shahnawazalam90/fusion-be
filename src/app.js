@@ -79,7 +79,7 @@ const createApp = async (models) => {
   const authService = new AuthService(userRepository);
   const fileService = new FileService(fileRepository);
   const scenarioService = new ScenarioService(scenarioRepository);
-  const reportService = new ReportService(reportRepository, scenarioRepository, userRepository);
+  const reportService = new ReportService(reportRepository, scenarioRepository, userRepository, requestRepository);
   const specFileService = new SpecFileService(specFileRepository);
   const scheduleService = new ScheduleService(scheduleRepository, reportService);
   const tenantService = new TenantService(tenantRepository);

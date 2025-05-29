@@ -47,9 +47,6 @@ class ScenarioRepository {
     if (updates.url !== undefined) {
       scenario.url = updates.url;
     }
-    if (updates.requestId !== undefined) {
-      scenario.requestId = updates.requestId;
-    }
 
     await scenario.save();
 

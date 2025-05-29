@@ -82,6 +82,8 @@ function parseAction(step) {
     action,
     parsedValue: value,
     value: '',
+    external_services: [],
+    requestId: null,
     raw
   };
 }

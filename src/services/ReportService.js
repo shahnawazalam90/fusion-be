@@ -74,11 +74,15 @@ class ReportService {
       )
     );
 
+    // Fetch associated requests if requestId is present
+    const requests = {};
+
     // Process each scenario
     const scenarioData = scenariosData
       .filter((scenario) => scenario) // Filter out null or undefined scenarios
-      .map((scenario) => {
+      .map(async (scenario) => {
         const jsonData = [];
+
         try {
           const scenarioValuesType = scenarios.find(
             (s) => s.scenarioId === scenario.id && s.valuesType
@@ -86,7 +90,7 @@ class ReportService {
 
           const jsonMetaData = JSON.parse(scenario.jsonMetaData).map((screen) => {
             let newScreen = { ...screen };
-            newScreen['actions'] = screen.actions.map((action) => {
+            newScreen['actions'] = screen.actions.map(async (action) => {
               const objectPattern = /(\{[^}]+\})/g;
               if (objectPattern.test(action.raw)) {
                 action.raw = action.raw.replace(objectPattern, (match) => {
@@ -97,6 +101,36 @@ class ReportService {
                   return formattedMatch;
                 });
               }
+
+              if (action.requestId) {
+                if (!requests[action.requestId]) {
+                  const request = await this.requestRepository.findById(action.requestId);
+                  requests[action.requestId] = request;
+                }
+
+                if (requests[action.requestId]) {
+                  action.external_services = [{
+                    "name": requests[action.requestId].name,
+                    "url": requests[action.requestId].url,
+                    "method": requests[action.requestId].method,
+                    "headers": JSON.parse(requests[action.requestId].headers || '{}'),
+                    "body": JSON.parse(requests[action.requestId].payload || '{}'),
+                    "type": requests[action.requestId].type,
+                    "expected_body": JSON.parse(requests[action.requestId].expectedResponse || '{}'),
+                  }];
+
+                  if (action.external_services.type === 'polling') {
+                    const pollingOptions = JSON.parse(requests[action.requestId].pollingOptions);
+                    action.external_services.polling_interval = Number(pollingOptions.pollingInterval);
+                    action.external_services.polling_timeout = Number(pollingOptions.pollingTimeout);
+                  }
+
+                  if (action.expected_status) {
+                    action.external_services.expected_status = Number(action.expected_status);
+                  }
+                }
+              }
+
               return action;
             });
             return newScreen;
@@ -125,7 +159,7 @@ class ReportService {
           }
         } catch (e) {
           // If it's not valid JSON, use it as a string
-          jsonData = scenario.jsonMetaData;
+          jsonData.push(scenario.jsonMetaData);
         }
 
         return jsonData.map((data) => ({
@@ -152,6 +186,8 @@ class ReportService {
     }
 
     const scenarioData = await this.getScenariosMetaData(report.scenarios);
+
+    console.log('Scenario data:', scenarioData);
 
     // Generate a unique filename
     const timestamp = new Date().getTime();

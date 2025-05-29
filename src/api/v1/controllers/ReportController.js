@@ -39,7 +39,7 @@ class ReportController {
   };
 
   createReport = catchAsync(async (req, res) => {
-    const { scenarios, status = 'pending' } = req.body;
+    const { scenarios, status = 'pending', browser } = req.body;
 
     let processedScenarios;
     try {
