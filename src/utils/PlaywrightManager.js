@@ -106,7 +106,7 @@ class PlaywrightManager {
           'test',
           '--project=chromium',
           '--headed',
-          'uploads/scripts/demo_latest.spec.ts'
+          'src/playwright/oracle.spec.ts'
         ], {
           env: {
             ...process.env,
