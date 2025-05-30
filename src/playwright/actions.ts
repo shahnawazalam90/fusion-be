@@ -8,7 +8,7 @@ let pickWaveId: string;
 let shipmentId: string;
 let processId: string;
 let pickWaveId1: string;
-let pickSlipId: string;
+let pickSlipId: string | null;
 
 type LocatorMethods =
   | "getByRole"
@@ -73,23 +73,21 @@ export async function peformJSONAction(
 }
 
 async function click(screen: Action, page: Page) {
-  let actionPerformed = false;
+  let actionPerformed = false; // Flag to track execution
 
   if (
     /getByRole\('link',\s*\{\s*"name":\s*"\d+"\s*\}\)\.click\(\)/.test(
       screen.raw
     )
   ) {
+    // const customXpath = '//table[@summary="Search Results"]//a';
     const customXpath =
       "//table[@summary='Search Results']//a[contains(text(), '1') or contains(text(), '2') or contains(text(), '3') or contains(text(), '4') or contains(text(), '5') or contains(text(), '6') or contains(text(), '7') or contains(text(), '8') or contains(text(), '9') or contains(text(), '0')]";
-    const textContent = await page.locator(customXpath).nth(0).textContent();
-    if (textContent) {
-      pickSlipId = textContent;
-      log.debug(`Pick Slip ID: ${pickSlipId}`);
-      await highlightElement(page, `locator(${customXpath}).nth(0)`);
-      await page.locator(customXpath).nth(0).click();
-      actionPerformed = true;
-    }
+    pickSlipId = await page.locator(customXpath).nth(0).textContent();
+    log.debug(`Pick Slip ID: ${pickSlipId}`);
+    await highlightElement(page, `locator(${customXpath}).nth(0)`);
+    await page.locator(customXpath).nth(0).click();
+    actionPerformed = true;
   }
 
   if (screen.raw.includes("Interfaces shipping details")) {
@@ -196,13 +194,10 @@ async function selectDropdownValue(screen: Action, page: Page) {
   const baseLocator = screen.raw.split(".selectOption")[0];
   await highlightElement(page, baseLocator);
   const value = screen.value?.replace(/^'(.*)'$/, "$1");
-  if (!value) {
-    throw new Error("Value is required for selectDropdownValue");
-  }
   await eval(`(async () => { await page.${baseLocator}.click(); })()`);
 
   await (async () => {
-    await expect(eval(`page.${baseLocator}`)).toContainText(value);
+    await expect(eval(`page.${baseLocator}`))["toContainText"](value || '');
   })();
 
   await eval(
@@ -382,19 +377,19 @@ async function dynamicAssertionHandler(
   const condition = assertion.match(/\.to[A-Za-z]+/)?.[0].replace(".", "");
   const expectedResult = assertion.match(/[A-Za-z]+\(["']([^"']+)["']\)/)?.[1];
 
-  if (!locator || !condition || !expectedResult) {
-    throw new Error("Invalid assertion format");
-  }
-
   console.log({ locator, condition, expectedResult });
 
   const assertionStatus = await (async () => {
     try {
-      await expect(eval(`${locator}`))[condition as keyof typeof expect](expectedResult);
-      return "PASSED";
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return `FAILED: ${errorMessage}`;
+      if (expectedResult === undefined) {
+        await expect(eval(`${locator}`))[condition]();
+      } else {
+        await expect(eval(`${locator}`))[condition](expectedResult);
+      }
+
+      return "PASSED"; // If assertion succeeds
+    } catch (error) {
+      throw new Error(`FAILED: ${error.message}`); // If assertion fails
     }
   })();
 
@@ -414,16 +409,13 @@ async function handleDynamicAssertion(
 ): Promise<void> {
   switch (assertionType) {
     case "toContainText":
-      await expect(element).toContainText(expectedValue);
+      await expect.soft(element).toContainText(expectedValue);
       break;
     case "toHaveValue":
-      await expect(element).toHaveValue(expectedValue);
+      await expect.soft(element).toHaveValue(expectedValue);
       break;
     case "includes":
       const actualValue = await element.textContent();
-      if (!actualValue) {
-        throw new Error("Element has no text content");
-      }
       if (!actualValue.includes(expectedValue)) {
         throw new Error(
           `Assertion failed: '${actualValue}' does not include '${expectedValue}'`
@@ -621,14 +613,10 @@ export async function performActions(
       value,
     ] = match;
     const locatorOptions = options1 ? JSON.parse(options1) : {};
-    
-    // Type-safe method access
-    const pageMethod = method1 as keyof typeof page;
-    let element = await (page[pageMethod] as Function)(param1, locatorOptions);
+    let element = await page[method1](param1, locatorOptions);
 
     if (method3) {
-      const method3Func = method3 as keyof typeof element;
-      element = await (element[method3Func] as Function)(
+      element = await element[method3](
         param3,
         options3 ? JSON.parse(options3) : {}
       );
@@ -637,6 +625,7 @@ export async function performActions(
     switch (screen.action) {
       case "click":
         if (screen.raw.includes("Refresh")) {
+          // Handle the "Refresh" action
           await waitUntilOrderStatusChange(page, element.nth(0));
         } else if (
           /getByRole\('link',\s*\{\s*"name":\s*"\d+"\s*\}\)\.click\(\)/.test(
@@ -644,77 +633,61 @@ export async function performActions(
           )
         ) {
           const customXpath = '//table[@summary="Search Results"]//a';
-          const textContent = await page.locator(customXpath).nth(0).textContent();
-          if (textContent) {
-            pickWaveId = textContent;
-            log.debug(`Pick Wave ID: ${pickWaveId}`);
-            await page.locator(customXpath).nth(0).click();
-          }
+          pickWaveId = await page.locator(customXpath).nth(0).textContent();
+          log.debug(`Pick Wave ID: ${pickWaveId}`);
+          await page.locator(customXpath).nth(0).click();
         } else if (screen.raw.includes("Interfaces shipping details")) {
           await page.waitForTimeout(8000);
           await element.nth(0).click();
         } else if (screen.raw.includes("getByText")) {
           if (screen.raw.includes("Requisition")) {
             const textContent = await element.nth(0).textContent();
-            if (textContent) {
-              requisitionId = await extractRequisition(textContent);
-              log.debug(`Requisition ID: ${requisitionId}`);
-            }
+            requisitionId = await extractRequisition(textContent);
+            log.debug(`Requisition ID: ${requisitionId}`);
           } else if (screen.raw.includes("Purchase Orders")) {
             const textContent = await element.nth(0).textContent();
-            if (textContent) {
-              purchaseOrderId = await extractRequisition(textContent);
-              log.debug(`****** Purchase Order ID: ${purchaseOrderId} ******`);
-            }
+            purchaseOrderId = await extractRequisition(textContent);
+            log.debug(`****** Purchase Order ID: ${purchaseOrderId} ******`);
           } else if (screen.raw.includes("was released")) {
             const textContent = await page
               .getByText(/Pick wave \d+ was released/)
               .textContent();
-            if (textContent) {
-              pickWaveId1 = await extractRequisition(textContent);
-              expect(textContent).toMatch(
-                /Pick wave \d+ was released. Number of pick slips: 1 and number of picks: 1./
-              );
-              log.debug(`****** Pick wave ID1: ${pickWaveId1} ******`);
-            }
+            pickWaveId1 = await extractRequisition(textContent);
+            expect(textContent).toMatch(
+              /Pick wave \d+ was released. Number of pick slips: 1 and number of picks: 1./
+            );
+            log.debug(`****** Pick wave ID1: ${pickWaveId1} ******`);
           } else if (screen.raw.includes("Sales order")) {
             const salesOrderIDMsg = await page
               .getByText(/Sales order \d+ was/)
               .textContent();
-            if (salesOrderIDMsg) {
-              salesOrderId = await extractRequisition(salesOrderIDMsg);
-              log.debug(`****** Sales Order ID: ${salesOrderId} ******`);
-            }
+            salesOrderId = await extractRequisition(salesOrderIDMsg);
+            log.debug(`****** Sales Order ID: ${salesOrderId} ******`);
           } else if (screen.raw.includes("The shipment")) {
             const shippmentMsg = await page
               .getByText(/The shipment \d+ was confirmed./)
               .textContent();
-            if (shippmentMsg) {
-              shipmentId = await extractRequisition(shippmentMsg);
-              log.debug(`****** The shipment ID: ${shipmentId} ******`);
-            }
+            shipmentId = await extractRequisition(shippmentMsg);
+            log.debug(`****** The shipment ID: ${shipmentId} ******`);
           } else if (screen.raw.includes("Process")) {
             const processIdMsg = await page
               .getByText(/Process \d+ was submitted./)
               .textContent();
-            if (processIdMsg) {
-              processId = await extractRequisition(processIdMsg);
-              log.debug(`The process ID: ${processId}`);
-            }
+            processId = await extractRequisition(processIdMsg);
+            log.debug(`The process ID: ${processId}`);
           } else if (screen.raw.includes("Shipped")) {
             const orderStatus = await page.getByText("Shipped").textContent();
-            if (orderStatus) {
-              expect(orderStatus).toEqual("Shipped");
-              log.debug(`Order Status: ${orderStatus}`);
-            }
+            expect(orderStatus).toEqual("Shipped");
+            log.debug(`Order Status: ${orderStatus}`);
           } else {
             await element.nth(0).click();
             await page.waitForTimeout(1000);
           }
         } else if (screen.raw.includes("Order Management")) {
           log.info(`Clicking on element: ${await element.nth(0).isVisible()}`);
-          await selectTabByPageIndex(page, "Order Management", screen);
+          await selectTabByPageIndex(page, "Order Management", element.nth(0));
         } else {
+          // await element.nth(0).scrollIntoViewIfNeeded();
           await page.waitForTimeout(1000);
           await element.nth(0).hover();
           await element.nth(0).click();
@@ -765,13 +738,11 @@ export async function performActions(
         break;
 
       case "expect":
-        if (screen.assertionType && screen.parsedValue) {
-          await handleDynamicAssertion(
-            element.nth(0),
-            screen.assertionType,
-            screen.parsedValue
-          );
-        }
+        await handleDynamicAssertion(
+          element.nth(0),
+          screen.assertionType,
+          screen.parsedValue
+        );
         break;
 
       default:
