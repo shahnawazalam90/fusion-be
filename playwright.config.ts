@@ -32,7 +32,7 @@ export default defineConfig({
     trace: 'on-first-retry',
     viewport: null,
     video: 'on',
-    screenshot: 'on',
+    screenshot: 'off',
     headless: true,
     launchOptions: {
       slowMo: 500,

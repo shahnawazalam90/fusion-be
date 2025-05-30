@@ -378,27 +378,57 @@ async function dynamicAssertionHandler(
   page: Page
 ): Promise<void> {
   const assertion = screen.raw;
-  const locator = assertion.match(/page\.(locator|getBy[A-Za-z]+)\(.*?\)/)?.[0];
-  const condition = assertion.match(/\.to[A-Za-z]+/)?.[0].replace(".", "");
-  const expectedResult = assertion.match(/[A-Za-z]+\(["']([^"']+)["']\)/)?.[1];
+  const locatorMatch = assertion.match(/page\.(locator|getBy[A-Za-z]+)\(.*?\)/);
+  const conditionMatch = assertion.match(/\.to[A-Za-z]+/);
+  const valueMatch = assertion.match(/[A-Za-z]+\(["']([^"']+)["']\)/);
 
-  if (!locator || !condition || !expectedResult) {
-    throw new Error("Invalid assertion format");
+  if (!locatorMatch || !conditionMatch) {
+    throw new Error('Invalid assertion format');
   }
+
+  const locator = locatorMatch[0];
+  const condition = conditionMatch[0].replace(".", "");
+  const expectedResult = valueMatch?.[1];
 
   console.log({ locator, condition, expectedResult });
 
-  const assertionStatus = await (async () => {
-    try {
-      await expect(eval(`${locator}`))[condition as keyof typeof expect](expectedResult);
-      return "PASSED";
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return `FAILED: ${errorMessage}`;
+  try {
+    const element = await page.locator(locator);
+    
+    switch (condition) {
+      case 'toContainText':
+        if (expectedResult) {
+          await expect(element).toContainText(expectedResult);
+        } else {
+          throw new Error('Expected result is required for toContainText');
+        }
+        break;
+      case 'toHaveText':
+        if (expectedResult) {
+          await expect(element).toHaveText(expectedResult);
+        } else {
+          throw new Error('Expected result is required for toHaveText');
+        }
+        break;
+      case 'toBeVisible':
+        await expect(element).toBeVisible();
+        break;
+      case 'toHaveValue':
+        if (expectedResult) {
+          await expect(element).toHaveValue(expectedResult);
+        } else {
+          throw new Error('Expected result is required for toHaveValue');
+        }
+        break;
+      default:
+        throw new Error(`Unsupported assertion condition: ${condition}`);
     }
-  })();
 
-  console.log(`Assertion status: ${assertionStatus}`);
+    console.log('Assertion status: PASSED');
+  } catch (error) {
+    console.log('Assertion status: FAILED');
+    throw error instanceof Error ? error : new Error(String(error));
+  }
 }
 
 /**
