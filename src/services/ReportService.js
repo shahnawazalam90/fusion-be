@@ -8,10 +8,11 @@ const fs = require('fs');
 const { sendEmail } = require('../utils/emailUtil'); // Add email utility import
 
 class ReportService {
-  constructor(reportRepository, scenarioRepository, userRepository) {
+  constructor(reportRepository, scenarioRepository, userRepository, requestRepository) {
     this.reportRepository = reportRepository;
     this.scenarioRepository = scenarioRepository;
-    this.userRepository = userRepository; // Add userRepository
+    this.userRepository = userRepository;
+    this.requestRepository = requestRepository;
   }
 
   async createReport(reportData) {
@@ -47,14 +48,15 @@ class ReportService {
     return this.reportRepository.create(reportData);
   }
 
-  async executePlaywrightTest(reportId, dataFile) {
+  async executePlaywrightTest(reportId, dataFile, browser) {
     try {
       const processInfo = await playwrightManager.executeTest({
         reportId,
         dataFile,
         onStatusUpdate: async (status) => {
           await this.updateReportStatus(reportId, status);
-        }
+        },
+        browser
       });
 
       return processInfo;
@@ -78,7 +80,7 @@ class ReportService {
     const requests = {};
 
     // Process each scenario
-    const scenarioData = scenariosData
+    const scenarioPromises = scenariosData
       .filter((scenario) => scenario) // Filter out null or undefined scenarios
       .map(async (scenario) => {
         const jsonData = [];
@@ -88,24 +90,36 @@ class ReportService {
             (s) => s.scenarioId === scenario.id && s.valuesType
           ).valuesType;
 
-          const jsonMetaData = JSON.parse(scenario.jsonMetaData).map((screen) => {
-            let newScreen = { ...screen };
-            newScreen['actions'] = screen.actions.map(async (action) => {
+          const jsonMetaData = JSON.parse(scenario.jsonMetaData);
+          
+          // Process screens and their actions
+          for (let i = 0; i < jsonMetaData.length; i++) {
+            const screen = jsonMetaData[i];
+            const newScreen = { ...screen };
+            
+            // Process actions for each screen
+            const processedActions = await Promise.all(screen.actions.map(async (action) => {
               const objectPattern = /(\{[^}]+\})/g;
               if (objectPattern.test(action.raw)) {
                 action.raw = action.raw.replace(objectPattern, (match) => {
-                  // Replace properties like name: 'value' with "name": "value"
                   const formattedMatch = match
-                    .replace(/(\w+):/g, '"$1":') // Add quotes to keys
-                    .replace(/'([^']+)'/g, '"$1"'); // Replace single quotes with double quotes
+                    .replace(/(\w+):/g, '"$1":')
+                    .replace(/'([^']+)'/g, '"$1"');
                   return formattedMatch;
                 });
               }
 
               if (action.requestId) {
                 if (!requests[action.requestId]) {
-                  const request = await this.requestRepository.findById(action.requestId);
-                  requests[action.requestId] = request;
+                  try {
+                    const request = await this.requestRepository.findById(action.requestId);
+                    if (!request) {
+                      console.log(`No request found for ID: ${action.requestId}`);
+                    }
+                    requests[action.requestId] = request;
+                  } catch (error) {
+                    console.error(`Error fetching request ${action.requestId}:`, error);
+                  }
                 }
 
                 if (requests[action.requestId]) {
@@ -117,29 +131,28 @@ class ReportService {
                     "body": JSON.parse(requests[action.requestId].payload || '{}'),
                     "type": requests[action.requestId].type,
                     "expected_body": JSON.parse(requests[action.requestId].expectedResponse || '{}'),
+                    "expected_status": requests[action.requestId].expectedStatus,
                   }];
 
-                  if (action.external_services.type === 'polling') {
+                  if (action.external_services[0].type === 'polling') {
                     const pollingOptions = JSON.parse(requests[action.requestId].pollingOptions);
-                    action.external_services.polling_interval = Number(pollingOptions.pollingInterval);
-                    action.external_services.polling_timeout = Number(pollingOptions.pollingTimeout);
+                    action.external_services[0].polling_interval = Number(pollingOptions.pollingInterval);
+                    action.external_services[0].polling_timeout = Number(pollingOptions.pollingTimeout);
                   }
 
-                  if (action.expected_status) {
-                    action.external_services.expected_status = Number(action.expected_status);
-                  }
                 }
               }
 
               return action;
-            });
-            return newScreen;
-          });
+            }));
+            
+            newScreen.actions = processedActions;
+            jsonMetaData[i] = newScreen;
+          }
 
           if (scenarioValuesType === 'manual') {
             JSON.parse(scenario.dataManual).forEach(([id, value]) => {
               const [i, j] = id.split(',').map(Number);
-
               jsonMetaData[i].actions[j].value = value;
             });
 
@@ -168,9 +181,10 @@ class ReportService {
           screens: data,
           url: scenario.url,
         }));
-      }).flat(1);
+      });
 
-    return scenarioData;
+    const scenarioData = await Promise.all(scenarioPromises);
+    return scenarioData.flat(1);
   }
 
   async saveScenarioMetadata(reportId) {

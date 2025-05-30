@@ -95,7 +95,7 @@ class PlaywrightManager {
    * @param {string} options.dataFile - Path to the data file
    * @returns {Promise<Object>} Process information
    */
-  async executeTest({ reportId, dataFile, onStatusUpdate }) {
+  async executeTest({ reportId, dataFile, onStatusUpdate, browser = 'chromium' }) {
     return new Promise((resolve, reject) => {
       try {
         console.log('Starting Playwright process with file:', dataFile);
@@ -104,7 +104,7 @@ class PlaywrightManager {
         const playwrightProcess = spawn('npx', [
           'playwright',
           'test',
-          '--project=chromium',
+          `--project=${browser}`,
           '--headed',
           'src/playwright/oracle.spec.ts'
         ], {

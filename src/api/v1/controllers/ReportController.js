@@ -70,7 +70,8 @@ class ReportController {
       // Execute Playwright test
       const processInfo = await this.reportService.executePlaywrightTest(
         report.id,
-        filename
+        filename,
+        browser
       );
 
       res.status(201).json({
