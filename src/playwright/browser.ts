@@ -75,11 +75,9 @@ export const setupBrowser = async (): Promise<Page> => {
   }
 
   context = await browser.newContext({
-    viewport: isLocal
-  ? { width: Number(process.env.WIDTH), height: Number(process.env.HEIGHT) }
-  : null,
+    viewport: { width: 1920, height: 1080 },
     acceptDownloads: true,
-    deviceScaleFactor: isLocal?  1 : undefined,
+    deviceScaleFactor: 1,
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
   });
 

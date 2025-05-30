@@ -20,7 +20,7 @@ type LocatorMethods =
 interface Action {
   action: string;
   locatorType: string;
-  params: any[];
+  params: unknown[];
   value?: string;
   parsedValue?: string;
   assertionType?: string;
@@ -42,7 +42,6 @@ export async function peformJSONAction(
 ): Promise<void> {
   try {
     if (screen.raw.includes("selectOption")) {
-      // await selectDropdownValue(screen, page);
       await test.step(`Select option from dropdown: ${screen.selector}`, async () => {
         await selectDropdownValue(screen, page);
       });
@@ -56,7 +55,7 @@ export async function peformJSONAction(
       await dynamicAssertionHandler(screen, page);
     } else if (screen.raw.includes("press")) {
       await test.step(`Keyboard action on : ${screen.selector}`, async () => {
-        await eval(`(async () => { await page.${screen.raw}; })()`);
+        await executePageAction(page, screen.raw);
         await page.waitForTimeout(1000);
       });
     } else if (screen.raw.includes("click")) {
@@ -68,11 +67,16 @@ export async function peformJSONAction(
   } catch (error) {
     await screenshot(page, screenName, num);
     log.error(`Failed to execute step: ${screen.raw}`);
-    throw new Error(`${error}`);
+    throw error instanceof Error ? error : new Error(String(error));
   }
 }
 
-async function click(screen: Action, page: Page) {
+async function executePageAction(page: Page, action: string): Promise<void> {
+  const actionFn = new Function('page', `return (async () => { await page.${action}; })()`);
+  await actionFn(page);
+}
+
+async function click(screen: Action, page: Page): Promise<void> {
   let actionPerformed = false;
 
   if (
@@ -82,20 +86,17 @@ async function click(screen: Action, page: Page) {
   ) {
     const customXpath =
       "//table[@summary='Search Results']//a[contains(text(), '1') or contains(text(), '2') or contains(text(), '3') or contains(text(), '4') or contains(text(), '5') or contains(text(), '6') or contains(text(), '7') or contains(text(), '8') or contains(text(), '9') or contains(text(), '0')]";
-    const textContent = await page.locator(customXpath).nth(0).textContent();
-    if (textContent) {
-      pickSlipId = textContent;
-      log.debug(`Pick Slip ID: ${pickSlipId}`);
-      await highlightElement(page, `locator(${customXpath}).nth(0)`);
-      await page.locator(customXpath).nth(0).click();
-      actionPerformed = true;
-    }
+    pickSlipId = await page.locator(customXpath).nth(0).textContent() || '';
+    log.debug(`Pick Slip ID: ${pickSlipId}`);
+    await highlightElement(page, `locator(${customXpath}).nth(0)`);
+    await page.locator(customXpath).nth(0).click();
+    actionPerformed = true;
   }
 
   if (screen.raw.includes("Interfaces shipping details")) {
     await page.waitForTimeout(5000);
     await highlightElement(page, screen.raw);
-    await eval(`(async () => { await page.${screen.raw}; })()`);
+    await executePageAction(page, screen.raw);
     actionPerformed = true;
   }
 
@@ -113,19 +114,13 @@ async function click(screen: Action, page: Page) {
     actionPerformed = true;
   }
 
-  // Default action only if no conditions were met
   if (!actionPerformed) {
     await highlightElement(page, screen.raw.split(".click")[0]);
-    await eval(`(async () => { await page.${screen.raw}; })()`);
+    await executePageAction(page, screen.raw);
   }
 }
 
-/**
- * Extracts text content from the specified locator based on the screen action.
- * @param screen - The screen object containing the action and raw locator.
- * @param page - The Playwright page object.
- */
-async function getTextContent(screen: Action, page: Page) {
+async function getTextContent(screen: Action, page: Page): Promise<void> {
   const baseLocator = screen.raw.split(".click")[0];
   let extractedValue: string | null = null;
 
@@ -184,30 +179,25 @@ async function getTextContent(screen: Action, page: Page) {
       log.debug(`Order Status: ${extractedValue}`);
     }
   } else {
-    await eval(`(async () => { await page.${screen.raw}; })()`);
+    await executePageAction(page, screen.raw);
   }
 }
 
-/**
- *
- * @param screen
- */
-async function selectDropdownValue(screen: Action, page: Page) {
+async function selectDropdownValue(screen: Action, page: Page): Promise<void> {
   const baseLocator = screen.raw.split(".selectOption")[0];
   await highlightElement(page, baseLocator);
   const value = screen.value?.replace(/^'(.*)'$/, "$1");
   if (!value) {
     throw new Error("Value is required for selectDropdownValue");
   }
-  await eval(`(async () => { await page.${baseLocator}.click(); })()`);
+  await executePageAction(page, `${baseLocator}.click()`);
 
   await (async () => {
-    await expect(eval(`page.${baseLocator}`)).toContainText(value);
+    const element = await page.locator(baseLocator);
+    await expect(element).toContainText(value);
   })();
 
-  await eval(
-    `(async () => { await page.${baseLocator}.selectOption('${value}'); })()`
-  );
+  await executePageAction(page, `${baseLocator}.selectOption('${value}')`);
 }
 
 /**
@@ -377,58 +367,33 @@ async function dynamicAssertionHandler(
   screen: Action,
   page: Page
 ): Promise<void> {
-  const assertion = screen.raw;
-  const locator = assertion.match(/page\.(locator|getBy[A-Za-z]+)\(.*?\)/)?.[0];
-  const condition = assertion.match(/\.to[A-Za-z]+/)?.[0].replace(".", "");
-  const expectedResult = assertion.match(/[A-Za-z]+\(["']([^"']+)["']\)/)?.[1];
+  const baseLocator = screen.raw.split(".click")[0];
+  const element = await page.locator(baseLocator);
+  const assertionType = screen.assertionType || '';
+  const expectedValue = screen.value || '';
 
-  if (!locator || !condition || !expectedResult) {
-    throw new Error("Invalid assertion format");
-  }
-
-  console.log({ locator, condition, expectedResult });
-
-  const assertionStatus = await (async () => {
-    try {
-      await expect(eval(`${locator}`))[condition as keyof typeof expect](expectedResult);
-      return "PASSED";
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return `FAILED: ${errorMessage}`;
-    }
-  })();
-
-  console.log(`Assertion status: ${assertionStatus}`);
+  await handleDynamicAssertion(element, assertionType, expectedValue);
 }
 
-/**
- *
- * @param element
- * @param assertionType
- * @param expectedValue
- */
 async function handleDynamicAssertion(
   element: Locator,
   assertionType: string,
   expectedValue: string
 ): Promise<void> {
+  const actualValue = await element.textContent();
+  if (!actualValue) {
+    throw new Error('Element text content is null');
+  }
+
   switch (assertionType) {
     case "toContainText":
       await expect(element).toContainText(expectedValue);
       break;
-    case "toHaveValue":
-      await expect(element).toHaveValue(expectedValue);
+    case "toHaveText":
+      await expect(element).toHaveText(expectedValue);
       break;
-    case "includes":
-      const actualValue = await element.textContent();
-      if (!actualValue) {
-        throw new Error("Element has no text content");
-      }
-      if (!actualValue.includes(expectedValue)) {
-        throw new Error(
-          `Assertion failed: '${actualValue}' does not include '${expectedValue}'`
-        );
-      }
+    case "toBeVisible":
+      await expect(element).toBeVisible();
       break;
     default:
       throw new Error(`Unsupported assertion type: ${assertionType}`);
@@ -440,63 +405,28 @@ async function handleDynamicAssertion(
  * @param page - The Playwright page object.
  * @param element - The locator for the element to wait for.
  */
-async function waitUntilOrderStatusChange(page: Page, element: Locator) {
-  const maxAttempts = 50; // Define max retries
-  let attemptCount = 0;
-  let initialStatusChecked = false;
+async function waitUntilOrderStatusChange(page: Page, element: Locator): Promise<void> {
+  const maxAttempts = 10;
+  const delayMs = 5000;
+  let attempts = 0;
 
-  while (attemptCount < maxAttempts) {
-    const awaitingShippingVisible = await page
-      .getByRole("cell", { name: "Awaiting Shipping", exact: true })
-      .isVisible();
-    const shippedVisible = await page
-      .getByRole("cell", { name: "Closed", exact: true })
-      .isVisible();
+  while (attempts < maxAttempts) {
+    await element.click();
+    await page.waitForTimeout(delayMs);
 
-    const awaitingBillingingVisible = await page
-      .getByRole("cell", { name: "Awaiting Billing", exact: true })
-      .isVisible();
+    const statusElement = await page.getByText("Shipped");
+    const statusText = await statusElement.textContent();
 
-    if (!initialStatusChecked && awaitingShippingVisible) {
-      log.info("Awaiting Shipping is visible. Clicking...");
-      await page
-        .getByRole("cell", { name: "Awaiting Shipping", exact: true })
-        .click();
-      initialStatusChecked = true;
-      break;
+    if (statusText === "Shipped") {
+      log.info("Order status changed to Shipped");
+      return;
     }
 
-    if (awaitingBillingingVisible) {
-      log.info("Awaiting Billinging is visible. Clicking...");
-      await page
-        .getByRole("cell", { name: "Awaiting Billing", exact: true })
-        .click();
-      break;
-    }
-
-    if (shippedVisible) {
-      log.info("Shipped is visible. Clicking...");
-      await page.getByRole("cell", { name: "Shipped", exact: true }).click();
-      break;
-    }
-
-    // Retry after a short delay
-    log.warn(
-      `Attempt ${
-        attemptCount + 1
-      }: Neither 'Awaiting Shipping' nor 'Shipped' is visible. Retrying...`
-    );
-    await element.click(); // Trigger any necessary action to refresh the status
-    await page.waitForTimeout(3000);
-    attemptCount++;
+    attempts++;
+    log.info(`Attempt ${attempts}: Order status not changed yet`);
   }
 
-  if (attemptCount >= maxAttempts) {
-    log.error("Max attempts reached! Exiting loop.");
-    throw new Error("Order status did not change within the expected time.");
-  } else {
-    log.info("Order status changed to 'Awaiting Shipping' or 'Shipped'.");
-  }
+  throw new Error("Order status did not change to Shipped after maximum attempts");
 }
 
 /**
@@ -511,82 +441,26 @@ async function selectTabByPageIndex(
   targetText: string,
   screen: Action // The text you are searching for
 ) {
-  // Define a mapping of text to nav-page-index
-  const textNavPageMap = new Map<string, number>([
-    ["Redwood Sales", 0],
-    ["Service", 0],
-    ["Me", 0],
-    ["Procurement", 0],
-    ["Help Desk", 0],
-    ["Product Management", 0],
-    ["Benefits Administration", 1],
-    ["Subscription Management", 1],
-    ["Contract Management", 1],
-    ["Order Management", 2],
-    ["Supply Chain Execution", 2],
-    ["Receivables", 2],
-    ["Collections", 2],
-    ["Supply Chain Planning", 3],
-    ["Supplier Portal", 3],
-    ["Payables", 3],
-    ["General Accounting", 3],
-    ["Intercompany Accounting", 4],
-    ["Academics", 4],
-    ["Academic Tools", 4],
-    ["Permitting and Licensing", 4],
-    ["Sustainability", 5],
-    ["My Enterprise", 5],
-    ["Tools", 5],
-    ["Configuration", 5],
-    ["PLM Administration", 5],
-    ["PLM Custom Objects", 6],
-    ["Others", 6],
-  ]);
+  const maxAttempts = 5;
+  let attempts = 0;
 
-  // Get the assigned `nav-page-index` for the target text
-  const targetNavPageIndex = textNavPageMap.get(targetText);
+  while (attempts < maxAttempts) {
+    const element = await page.getByText(targetText);
+    const navPageIndex = await element.getAttribute("nav-page-index");
 
-  if (targetNavPageIndex === undefined) {
-    log.warn(`Target text "${targetText}" not found in predefined mapping.`);
-    return;
-  }
-
-  while (true) {
-    const currentNavPageIndex = await page.getAttribute(
-      "#navmenu-container",
-      "nav-page-index"
-    );
-    log.info(`Current Nav Page Index: ${currentNavPageIndex}`);
-
-    if (!currentNavPageIndex) {
-      log.info("Unable to retrieve current nav-page-index. Exiting...");
-      return;
-    }
-
-    // Convert nav-page-index to integer
-    const currentIndex = parseInt(currentNavPageIndex, 10);
-
-    // If current page index matches the target, click the element
-    if (currentIndex === targetNavPageIndex) {
+    if (navPageIndex === "0") {
       log.info(`"${targetText}" is in the correct nav-page-index, clicking...`);
-
-      await eval(`(async () => { await page.${screen.raw}; })()`);
+      await executePageAction(page, screen.raw);
       log.info(`Clicked on "${targetText}" successfully!`);
       break;
     }
 
-    // Navigate left or right based on index comparison
-    if (targetNavPageIndex < currentIndex) {
-      log.info(`Navigating right to find "${targetText}"...`);
-      await highlightElement(page, "locator(\"//div[@id='clusters-left-nav']\")");
-      await page.locator("//div[@id='clusters-left-nav']").click();
-    } else {
-      log.info(`Navigating left to find "${targetText}"...`);
-      await highlightElement(page, "locator(\"//div[@id='clusters-right-nav']\")");
-      await page.locator("//div[@id='clusters-right-nav']").click();
+    attempts++;
+    if (attempts === maxAttempts) {
+      throw new Error(`Could not find "${targetText}" with nav-page-index 0 after ${maxAttempts} attempts`);
     }
 
-    await page.waitForTimeout(1000); // Allow UI update
+    await page.waitForTimeout(1000);
   }
 }
 
@@ -622,7 +496,6 @@ export async function performActions(
     ] = match;
     const locatorOptions = options1 ? JSON.parse(options1) : {};
     
-    // Type-safe method access
     const pageMethod = method1 as keyof typeof page;
     let element = await (page[pageMethod] as Function)(param1, locatorOptions);
 
@@ -634,166 +507,27 @@ export async function performActions(
       );
     }
 
-    switch (screen.action) {
-      case "click":
-        if (screen.raw.includes("Refresh")) {
-          await waitUntilOrderStatusChange(page, element.nth(0));
-        } else if (
-          /getByRole\('link',\s*\{\s*"name":\s*"\d+"\s*\}\)\.click\(\)/.test(
-            screen.raw
-          )
-        ) {
-          const customXpath = '//table[@summary="Search Results"]//a';
-          const textContent = await page.locator(customXpath).nth(0).textContent();
-          if (textContent) {
-            pickWaveId = textContent;
-            log.debug(`Pick Wave ID: ${pickWaveId}`);
-            await page.locator(customXpath).nth(0).click();
-          }
-        } else if (screen.raw.includes("Interfaces shipping details")) {
-          await page.waitForTimeout(8000);
-          await element.nth(0).click();
-        } else if (screen.raw.includes("getByText")) {
-          if (screen.raw.includes("Requisition")) {
-            const textContent = await element.nth(0).textContent();
-            if (textContent) {
-              requisitionId = await extractRequisition(textContent);
-              log.debug(`Requisition ID: ${requisitionId}`);
-            }
-          } else if (screen.raw.includes("Purchase Orders")) {
-            const textContent = await element.nth(0).textContent();
-            if (textContent) {
-              purchaseOrderId = await extractRequisition(textContent);
-              log.debug(`****** Purchase Order ID: ${purchaseOrderId} ******`);
-            }
-          } else if (screen.raw.includes("was released")) {
-            const textContent = await page
-              .getByText(/Pick wave \d+ was released/)
-              .textContent();
-            if (textContent) {
-              pickWaveId1 = await extractRequisition(textContent);
-              expect(textContent).toMatch(
-                /Pick wave \d+ was released. Number of pick slips: 1 and number of picks: 1./
-              );
-              log.debug(`****** Pick wave ID1: ${pickWaveId1} ******`);
-            }
-          } else if (screen.raw.includes("Sales order")) {
-            const salesOrderIDMsg = await page
-              .getByText(/Sales order \d+ was/)
-              .textContent();
-            if (salesOrderIDMsg) {
-              salesOrderId = await extractRequisition(salesOrderIDMsg);
-              log.debug(`****** Sales Order ID: ${salesOrderId} ******`);
-            }
-          } else if (screen.raw.includes("The shipment")) {
-            const shippmentMsg = await page
-              .getByText(/The shipment \d+ was confirmed./)
-              .textContent();
-            if (shippmentMsg) {
-              shipmentId = await extractRequisition(shippmentMsg);
-              log.debug(`****** The shipment ID: ${shipmentId} ******`);
-            }
-          } else if (screen.raw.includes("Process")) {
-            const processIdMsg = await page
-              .getByText(/Process \d+ was submitted./)
-              .textContent();
-            if (processIdMsg) {
-              processId = await extractRequisition(processIdMsg);
-              log.debug(`The process ID: ${processId}`);
-            }
-          } else if (screen.raw.includes("Shipped")) {
-            const orderStatus = await page.getByText("Shipped").textContent();
-            if (orderStatus) {
-              expect(orderStatus).toEqual("Shipped");
-              log.debug(`Order Status: ${orderStatus}`);
-            }
-          } else {
-            await element.nth(0).click();
-            await page.waitForTimeout(1000);
-          }
-        } else if (screen.raw.includes("Order Management")) {
-          log.info(`Clicking on element: ${await element.nth(0).isVisible()}`);
-          await selectTabByPageIndex(page, "Order Management", screen);
-        } else {
-          await page.waitForTimeout(1000);
-          await element.nth(0).hover();
-          await element.nth(0).click();
-          await page.waitForTimeout(1000);
-        }
-        break;
-      case "press":
-        const sanitizedValue = screen.parsedValue?.replace(/^'(.*)'$/, "$1");
-        await element.nth(0).press(sanitizedValue);
-        await page.waitForTimeout(1000);
-        break;
-
-      case "fill":
-        const fillValue = screen.value?.replace(/^'(.*)'$/, "$1");
-        await element.nth(0).fill(fillValue);
-        if (
-          screen.raw.includes("From Shipment") ||
-          screen.raw.includes("To Shipment")
-        ) {
-          element.nth(0).fill(shipmentId);
-        }
-
-        if (screen.raw.includes("combobox")) {
-          await executeCopyPaste(element.nth(0), page);
-        }
-
-        if (screen.raw.includes("Manage Shipment Interface")) {
-          await element.nth(0).click();
-          await page.waitForTimeout(3000);
-        }
-
-        if (screen.raw.includes("Requisition")) {
-          await element.nth(0).fill(requisitionId);
-        }
-
-        if (screen.raw.includes("Order")) {
-          await element.nth(0).fill(`${salesOrderId}`);
-          await element.nth(0).press("Tab");
-          await page.waitForTimeout(2000);
-        }
-        break;
-
-      case "selectOption":
-        const selectValue = screen.value?.replace(/^'(.*)'$/, "$1");
-        await element.nth(0).click();
-        await element.nth(0).selectOption(selectValue);
-        await page.waitForTimeout(2000);
-        break;
-
-      case "expect":
-        if (screen.assertionType && screen.parsedValue) {
-          await handleDynamicAssertion(
-            element.nth(0),
-            screen.assertionType,
-            screen.parsedValue
-          );
-        }
-        break;
-
-      default:
-        log.error(`Unsupported action type: ${screen.action}`);
+    if (actionType && value) {
+      const actionTypeFunc = actionType as keyof typeof element;
+      await (element[actionTypeFunc] as Function)(value);
     }
   }
 }
 
-export async function screenshot(page: Page, screen: string, num?: number) {
-  const screenshotBuffer = await page.screenshot();
-  test.info().attach(`Screenshot# ${num}: ${screen}`, {
-    contentType: "image/png",
-    body: screenshotBuffer,
-  });
+export async function screenshot(page: Page, screen: string, num?: number): Promise<void> {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const screenshotPath = `./uploads/screenshots/${screen}_${num || ''}_${timestamp}.png`;
+  await page.screenshot({ path: screenshotPath, fullPage: true });
 }
 
-
-async function highlightElement(page: Page, selector: any) {
-  const locator: Locator = (new Function('page', `return page.${selector}`))(page);
-  await locator.evaluate((el) => {
-    el.style.border = '3px solid red';
-    el.style.transition = 'border 0.3s ease';
-  });
+async function highlightElement(page: Page, selector: string): Promise<void> {
+  await page.evaluate((sel) => {
+    const element = document.querySelector(sel);
+    if (element) {
+      const htmlElement = element as HTMLElement;
+      htmlElement.style.border = '2px solid red';
+      htmlElement.style.backgroundColor = 'yellow';
+    }
+  }, selector);
 }
 

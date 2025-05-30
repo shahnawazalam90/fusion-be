@@ -33,10 +33,17 @@ export default defineConfig({
     viewport: null,
     video: 'on',
     screenshot: 'on',
-    headless: false,
+    headless: true,
     launchOptions: {
       slowMo: 500,
-      args: ['--start-maximized']
+      args: [
+        '--start-maximized',
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu'
+      ]
     },
     navigationTimeout: 10 * 60 * 1000,
   },

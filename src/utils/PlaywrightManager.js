@@ -105,12 +105,12 @@ class PlaywrightManager {
           'playwright',
           'test',
           `--project=${browser}`,
-          '--headed',
           'src/playwright/oracle.spec.ts'
         ], {
           env: {
             ...process.env,
-            DATAFILE: dataFile
+            DATAFILE: dataFile,
+            HEADLESS: 'true'
           },
           stdio: ['inherit', 'pipe', 'pipe']
         });
