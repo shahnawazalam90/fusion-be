@@ -82,8 +82,6 @@ function parseAction(step) {
     action,
     parsedValue: value,
     value: '',
-    external_services: [],
-    requestId: null,
     raw
   };
 }
@@ -100,7 +98,9 @@ function convertPlaywrightToJson(scenario, steps) {
       // Start a new screen section
       currentScreen = {
         screenName: screenCommentMatch[1].trim(),
-        actions: []
+        actions: [],
+        external_services: [],
+        requestId: null,
       };
       screens.push(currentScreen);
       return;

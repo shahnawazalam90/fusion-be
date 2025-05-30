@@ -68,123 +68,123 @@ class ReportService {
   }
 
   async getScenariosMetaData(scenarios) {
-    // scenarios: [{ scenarioId, valuesType }]
-    const scenarioIds = scenarios.map(s => s.scenarioId);
+    const scenarioValuesType = Object.fromEntries(scenarios.map(s => [s.scenarioId, s.valuesType]));
     const scenariosData = await Promise.all(
-      scenarioIds.map((scenarioId) =>
+      Object.keys(scenarioValuesType).map((scenarioId) =>
         this.scenarioRepository.findById(scenarioId)
       )
-    );
+    ).then((results) => results.filter((scenario) => scenario));
 
-    // Fetch associated requests if requestId is present
     const requests = {};
 
-    // Process each scenario
-    const scenarioPromises = scenariosData
-      .filter((scenario) => scenario) // Filter out null or undefined scenarios
-      .map(async (scenario) => {
-        const jsonData = [];
+    const scenariosDataParsed = scenariosData.map((scenario) => {
+      try {
+        scenario.jsonMetaData = JSON.parse(scenario.jsonMetaData);
 
-        try {
-          const scenarioValuesType = scenarios.find(
-            (s) => s.scenarioId === scenario.id && s.valuesType
-          ).valuesType;
-
-          const jsonMetaData = JSON.parse(scenario.jsonMetaData);
-          
-          // Process screens and their actions
-          for (let i = 0; i < jsonMetaData.length; i++) {
-            const screen = jsonMetaData[i];
-            const newScreen = { ...screen };
-            
-            // Process actions for each screen
-            const processedActions = await Promise.all(screen.actions.map(async (action) => {
-              const objectPattern = /(\{[^}]+\})/g;
-              if (objectPattern.test(action.raw)) {
-                action.raw = action.raw.replace(objectPattern, (match) => {
-                  const formattedMatch = match
-                    .replace(/(\w+):/g, '"$1":')
-                    .replace(/'([^']+)'/g, '"$1"');
-                  return formattedMatch;
-                });
-              }
-
-              if (action.requestId) {
-                if (!requests[action.requestId]) {
-                  try {
-                    const request = await this.requestRepository.findById(action.requestId);
-                    if (!request) {
-                      console.log(`No request found for ID: ${action.requestId}`);
-                    }
-                    requests[action.requestId] = request;
-                  } catch (error) {
-                    console.error(`Error fetching request ${action.requestId}:`, error);
-                  }
-                }
-
-                if (requests[action.requestId]) {
-                  action.external_services = [{
-                    "name": requests[action.requestId].name,
-                    "url": requests[action.requestId].url,
-                    "method": requests[action.requestId].method,
-                    "headers": JSON.parse(requests[action.requestId].headers || '{}'),
-                    "body": JSON.parse(requests[action.requestId].payload || '{}'),
-                    "type": requests[action.requestId].type,
-                    "expected_body": JSON.parse(requests[action.requestId].expectedResponse || '{}'),
-                    "expected_status": requests[action.requestId].expectedStatus,
-                  }];
-
-                  if (action.external_services[0].type === 'polling') {
-                    const pollingOptions = JSON.parse(requests[action.requestId].pollingOptions);
-                    action.external_services[0].polling_interval = Number(pollingOptions.pollingInterval);
-                    action.external_services[0].polling_timeout = Number(pollingOptions.pollingTimeout);
-                  }
-
-                }
-              }
-
-              return action;
-            }));
-            
-            newScreen.actions = processedActions;
-            jsonMetaData[i] = newScreen;
-          }
-
-          if (scenarioValuesType === 'manual') {
-            JSON.parse(scenario.dataManual).forEach(([id, value]) => {
-              const [i, j] = id.split(',').map(Number);
-              jsonMetaData[i].actions[j].value = value;
-            });
-
-            jsonData.push(jsonMetaData);
-          } else if (scenarioValuesType === 'excel') {
-            JSON.parse(scenario.dataExcel).forEach(([id, ...value]) => {
-              const [i, j] = id.split(',').map(Number);
-
-              value.forEach((val, index) => {
-                if (!jsonData[index]) {
-                  jsonData[index] = JSON.parse(JSON.stringify(jsonMetaData));
-                }
-
-                jsonData[index][i].actions[j].value = typeof val !== 'string' ? String(val) : val;
+        scenario.jsonMetaData = scenario.jsonMetaData.map((screen) => {
+          screen.actions = screen.actions.map((action) => {
+            const objectPattern = /(\{[^}]+\})/g;
+            if (objectPattern.test(action.raw)) {
+              action.raw = action.raw.replace(objectPattern, (match) => {
+                const formattedMatch = match
+                  .replace(/(\w+):/g, '"$1":')
+                  .replace(/'([^']+)'/g, '"$1"');
+                return formattedMatch;
               });
-            });
-          }
-        } catch (e) {
-          // If it's not valid JSON, use it as a string
-          jsonData.push(scenario.jsonMetaData);
-        }
+            }
 
-        return jsonData.map((data) => ({
-          id: scenario.id,
-          scenario: scenario.name,
-          screens: data,
-          url: scenario.url,
-        }));
+            return action;
+          });
+
+          if (screen.requestId) {
+            requests[screen.requestId] = requests[screen.requestId] || {};
+          }
+
+          return screen;
+        });
+      } catch (e) {
+        console.error(`Error parsing JSON for scenario ${scenario.id}:`, e);
+        scenario.jsonMetaData = scenario.jsonMetaData || [];
+      }
+
+      return scenario;
+    });
+
+    await Promise.all(Object.keys(requests).map(async (requestId) =>
+      this.requestRepository.findById(requestId)
+        .then((request) => {
+          if (request) {
+            requests[requestId] = {
+              name: request.name,
+              url: request.url,
+              method: request.method,
+              headers: JSON.parse(request.headers || '{}'),
+              body: JSON.parse(request.payload || '{}'),
+              type: request.type,
+              expected_body: JSON.parse(request.expectedResponse || '{}'),
+              expected_status: request.expectedStatus,
+            };
+
+            if (request.type === 'polling') {
+              const pollingOptions = JSON.parse(request.pollingOptions);
+              requests[requestId].polling_interval = Number(pollingOptions.pollingInterval);
+              requests[requestId].polling_timeout = Number(pollingOptions.pollingTimeout);
+            }
+          } else {
+            console.log(`No request found for ID: ${requestId}`);
+            requests[requestId] = null; // Set to null if no request found
+          }
+
+          return;
+        })
+    ));
+
+    return scenariosDataParsed.map(scenario => {
+      if (typeof scenario.jsonMetaData === 'string') return ({
+        id: scenario.id,
+        scenario: scenario.name,
+        screens: scenario.jsonMetaData,
+        url: scenario.url,
       });
 
-    const scenarioData = await Promise.all(scenarioPromises);
-    return scenarioData.flat(1);
+      const jsonData = [];
+
+      const jsonMetaData = JSON.parse(JSON.stringify(scenario.jsonMetaData)).map((screen) => {
+        const newScreen = { ...screen };
+
+        newScreen.external_services = requests[screen.requestId] ? [requests[screen.requestId]] : [];
+
+        return newScreen;
+      });
+
+      if (scenarioValuesType[scenario.id] === 'manual') {
+        JSON.parse(scenario.dataManual).forEach(([id, value]) => {
+          const [i, j] = id.split(',').map(Number);
+          jsonMetaData[i].actions[j].value = value;
+        });
+
+        jsonData.push(jsonMetaData);
+      } else if (scenarioValuesType === 'excel') {
+        JSON.parse(scenario.dataExcel).forEach(([id, ...value]) => {
+          const [i, j] = id.split(',').map(Number);
+
+          value.forEach((val, index) => {
+            if (!jsonData[index]) {
+              jsonData[index] = JSON.parse(JSON.stringify(jsonMetaData));
+            }
+
+            jsonData[index][i].actions[j].value = typeof val !== 'string' ? String(val) : val;
+          });
+        });
+      }
+
+      return jsonData.map((data) => ({
+        id: scenario.id,
+        scenario: scenario.name,
+        screens: data,
+        url: scenario.url,
+      }));
+    }).flat(1);
   }
 
   async saveScenarioMetadata(reportId) {

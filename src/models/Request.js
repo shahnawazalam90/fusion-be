@@ -49,6 +49,10 @@ module.exports = (sequelize) => {
         this.setDataValue('pollingOptions', JSON.stringify(val || {}));
       }
     },
+    expectedStatus: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+    },
     expectedResponse: {
       type: DataTypes.TEXT,
       allowNull: true,
