@@ -88,20 +88,22 @@ async function click(screen: Action, page: Page): Promise<void> {
       "//table[@summary='Search Results']//a[contains(text(), '1') or contains(text(), '2') or contains(text(), '3') or contains(text(), '4') or contains(text(), '5') or contains(text(), '6') or contains(text(), '7') or contains(text(), '8') or contains(text(), '9') or contains(text(), '0')]";
     pickSlipId = await page.locator(customXpath).nth(0).textContent() || '';
     log.debug(`Pick Slip ID: ${pickSlipId}`);
-    await highlightElement(page, `locator(${customXpath}).nth(0)`);
+    await highlightElement(page, customXpath);
     await page.locator(customXpath).nth(0).click();
     actionPerformed = true;
   }
 
   if (screen.raw.includes("Interfaces shipping details")) {
     await page.waitForTimeout(5000);
-    await highlightElement(page, screen.raw);
+    const baseLocator = screen.raw.split(".click")[0];
+    await highlightElement(page, baseLocator);
     await executePageAction(page, screen.raw);
     actionPerformed = true;
   }
 
   if (screen.raw.includes("Refresh")) {
-    await highlightElement(page, screen.raw.split(".click")[0]);
+    const baseLocator = screen.raw.split(".click")[0];
+    await highlightElement(page, baseLocator);
     await waitUntilOrderStatusChange(
       page,
       await page.getByRole("button", { name: "Refresh" })
@@ -115,7 +117,8 @@ async function click(screen: Action, page: Page): Promise<void> {
   }
 
   if (!actionPerformed) {
-    await highlightElement(page, screen.raw.split(".click")[0]);
+    const baseLocator = screen.raw.split(".click")[0];
+    await highlightElement(page, baseLocator);
     await executePageAction(page, screen.raw);
   }
 }
@@ -521,13 +524,28 @@ export async function screenshot(page: Page, screen: string, num?: number): Prom
 }
 
 async function highlightElement(page: Page, selector: string): Promise<void> {
-  await page.evaluate((sel) => {
-    const element = document.querySelector(sel);
-    if (element) {
-      const htmlElement = element as HTMLElement;
-      htmlElement.style.border = '2px solid red';
-      htmlElement.style.backgroundColor = 'yellow';
+  try {
+    // Handle Playwright selectors
+    if (selector.startsWith('getByRole') || selector.startsWith('locator')) {
+      const element = await page.locator(selector);
+      await element.evaluate((el) => {
+        const htmlElement = el as HTMLElement;
+        htmlElement.style.border = '2px solid red';
+        htmlElement.style.backgroundColor = 'yellow';
+      });
+    } else {
+      // Handle CSS selectors
+      await page.evaluate((sel) => {
+        const element = document.querySelector(sel);
+        if (element) {
+          const htmlElement = element as HTMLElement;
+          htmlElement.style.border = '2px solid red';
+          htmlElement.style.backgroundColor = 'yellow';
+        }
+      }, selector);
     }
-  }, selector);
+  } catch (error) {
+    log.warn(`Failed to highlight element with selector: ${selector}`);
+  }
 }
 
