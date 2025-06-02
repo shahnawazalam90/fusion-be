@@ -164,7 +164,7 @@ class ReportService {
         });
 
         jsonData.push(jsonMetaData);
-      } else if (scenarioValuesType === 'excel') {
+      } else if (scenarioValuesType[scenario.id] === 'excel') {
         JSON.parse(scenario.dataExcel).forEach(([id, ...value]) => {
           const [i, j] = id.split(',').map(Number);
 
