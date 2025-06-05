@@ -80,7 +80,7 @@ export const setupBrowser = async (): Promise<Page> => {
   }
 
   context = await browser.newContext({
-    viewport: { width: 1920, height: 1080 },
+    viewport: { width: 1366, height: 768 },
     acceptDownloads: true,
     deviceScaleFactor: 1,
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
