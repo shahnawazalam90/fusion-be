@@ -49,6 +49,9 @@ Thumbs.db
 uploads/reports/
 uploads/scenarios/
 uploads/specs/
+uploads/videos/
+uploads/screenshots/
+uploads/captures/
 
 # Playwright reports
 playwright-report/

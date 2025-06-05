@@ -57,6 +57,12 @@ function parseSpecSteps(filePath) {
           locator = `//[Text='${textMatch[1]}']`;
         }
 
+        // Handle getByTestId
+        const testIdMatch = line.match(/getByTestId\('(.*?)'\)/);
+        if (testIdMatch) {
+          locator = `//[@data-testid='${testIdMatch[1]}']`;
+        }
+
         // Handle locator
         const locatorMatch = line.match(/locator\('(.*?)'\)/);
         if (locatorMatch) {

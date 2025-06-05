@@ -21,6 +21,8 @@ export let page: Page;
 
 dotenv.config({ path: path.resolve(__dirname, '..', 'config', '.env') });
 
+const reportFolder = process.env.DATAFILE || '';
+
 export const setupBrowser = async (): Promise<Page> => {
   const browserName = process.env.BROWSER || "chrome";
   let device: any;
@@ -36,6 +38,9 @@ export const setupBrowser = async (): Promise<Page> => {
       device = devices["Desktop Firefox"];
       break;
     case "safari":
+      browser = await webkit.launch();
+      break;
+    case "webkit":
       browser = await webkit.launch();
       break;
     case "edge":
@@ -79,6 +84,10 @@ export const setupBrowser = async (): Promise<Page> => {
     acceptDownloads: true,
     deviceScaleFactor: 1,
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+    recordVideo: {
+      dir: './uploads/reports/' + reportFolder.replace(/\.[^/.]+$/, '') + '/videos',
+      size: { width: 1920, height: 1080 }
+    }
   });
 
   const page = await context.newPage();

@@ -61,6 +61,12 @@ function parseAction(step) {
     if (textMatch) {
       selector = textMatch[1];
     }
+  } else if (raw.includes('getByTestId')) {
+    method = 'getByTestId';
+    const testIdMatch = raw.match(/getByTestId\('([^']+)'\)/);
+    if (testIdMatch) {
+      selector = testIdMatch[1];
+    }
   } else if (raw.includes('getByTitle')) {
     method = 'getByTitle';
     const titleMatch = raw.match(/getByTitle\('([^']+)'\)/);

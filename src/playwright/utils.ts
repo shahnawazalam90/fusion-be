@@ -161,3 +161,22 @@ export async function handleExternalService(apidata: any) {
     throw new Error(`Unsupported service type: ${service.type}`);
   }
 }
+
+export async function captureVideo(page: Page, scenario: string, testInfo: any) {
+  await page.close();
+
+  const video = page.video();
+  if (video) {
+    const reportFolder = process.env.DATAFILE || '';
+    const videoPath = `./uploads/reports/${reportFolder.replace(/\.[^/.]+$/, '')}/videos/${scenario.replace(
+      /\W+/g,
+      "_"
+    )}_${Date.now()}.webm`;
+    console.log(`Video path: ${videoPath}`)
+    await video.saveAs(videoPath);
+    await testInfo.attach(`${videoPath}`, {
+      path: videoPath,
+      contentType: "video/webm",
+    });
+  }
+}

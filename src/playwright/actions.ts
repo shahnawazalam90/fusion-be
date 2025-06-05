@@ -1,5 +1,5 @@
-import test, { expect, Locator, Page } from "@playwright/test";
-import { executeCopyPaste, extractRequisition, log } from "./utils";
+import test, { expect, Locator, Page } from '@playwright/test';
+import { executeCopyPaste, extractRequisition, log } from './utils';
 
 let requisitionId: string;
 let purchaseOrderId: string;
@@ -11,11 +11,12 @@ let pickWaveId1: string;
 let pickSlipId: string;
 
 type LocatorMethods =
-  | "getByRole"
-  | "getByLabel"
-  | "getByText"
-  | "locator"
-  | "getByTitle";
+  | 'getByRole'
+  | 'getByTestId'
+  | 'getByLabel'
+  | 'getByText'
+  | 'locator'
+  | 'getByTitle';
 
 interface Action {
   action: string;
@@ -34,32 +35,37 @@ interface Action {
   };
 }
 
-export async function peformJSONAction(
+export async function performJSONAction(
   page: Page,
   screen: Action,
   screenName: string,
   num?: number
 ): Promise<void> {
   try {
-    if (screen.raw.includes("selectOption")) {
+    if (screen.raw.includes('selectOption')) {
       // await selectDropdownValue(screen, page);
       await test.step(`Select option from dropdown: ${screen.selector}`, async () => {
         await selectDropdownValue(screen, page);
       });
-    } else if (screen.raw.includes("fill")) {
+    } else if (screen.raw.includes('fill')) {
       await test.step(`Entered '${screen.selector}' text field with '${screen.value}' value`, async () => {
         await setTextInInputBox(screen, page);
       });
-    } else if (screen.raw.includes("getByText")) {
+    } else if (screen.raw.includes('getByText')) {
       await getTextContent(screen, page);
-    } else if (screen.raw.includes("expect")) {
+    } else if (screen.raw.includes('expect')) {
       await dynamicAssertionHandler(screen, page);
-    } else if (screen.raw.includes("press")) {
+    } else if (screen.raw.includes('press')) {
       await test.step(`Keyboard action on : ${screen.selector}`, async () => {
         await eval(`(async () => { await page.${screen.raw}; })()`);
         await page.waitForTimeout(1000);
       });
-    } else if (screen.raw.includes("click")) {
+    } else if (screen.raw.includes('check')) {
+      await test.step(`checkbox is checked on : ${screen.selector}`, async () => {
+        await highlightElement(page, screen.raw.split('.click')[0]);
+        await eval(`(async () => { await page.${screen.raw}; })()`);
+      });
+    } else if (screen.raw.includes('click')) {
       await test.step(`clicked on : ${screen.selector}`, async () => {
         await click(screen, page);
       });
@@ -92,30 +98,30 @@ async function click(screen: Action, page: Page) {
     }
   }
 
-  if (screen.raw.includes("Interfaces shipping details")) {
+  if (screen.raw.includes('Interfaces shipping details')) {
     await page.waitForTimeout(5000);
     await highlightElement(page, screen.raw);
     await eval(`(async () => { await page.${screen.raw}; })()`);
     actionPerformed = true;
   }
 
-  if (screen.raw.includes("Refresh")) {
-    await highlightElement(page, screen.raw.split(".click")[0]);
+  if (screen.raw.includes('Refresh')) {
+    await highlightElement(page, screen.raw.split('.click')[0]);
     await waitUntilOrderStatusChange(
       page,
-      await page.getByRole("button", { name: "Refresh" })
+      await page.getByRole('button', { name: 'Refresh' })
     );
     actionPerformed = true;
   }
 
-  if (screen.raw.includes("Order Management")) {
-    await selectTabByPageIndex(page, "Order Management", screen);
+  if (screen.raw.includes('Order Management')) {
+    await selectTabByPageIndex(page, 'Order Management', screen);
     actionPerformed = true;
   }
 
   // Default action only if no conditions were met
   if (!actionPerformed) {
-    await highlightElement(page, screen.raw.split(".click")[0]);
+    await highlightElement(page, screen.raw.split('.click')[0]);
     await eval(`(async () => { await page.${screen.raw}; })()`);
   }
 }
@@ -126,22 +132,22 @@ async function click(screen: Action, page: Page) {
  * @param page - The Playwright page object.
  */
 async function getTextContent(screen: Action, page: Page) {
-  const baseLocator = screen.raw.split(".click")[0];
+  const baseLocator = screen.raw.split('.click')[0];
   let extractedValue: string | null = null;
 
-  if (screen.raw.includes("Requisition")) {
+  if (screen.raw.includes('Requisition')) {
     const textContent = await page.locator(baseLocator).textContent();
     if (textContent) {
       requisitionId = await extractRequisition(textContent);
       log.debug(`Requisition ID: ${requisitionId}`);
     }
-  } else if (screen.raw.includes("Purchase Orders")) {
+  } else if (screen.raw.includes('Purchase Orders')) {
     const textContent = await page.locator(baseLocator).textContent();
     if (textContent) {
       purchaseOrderId = await extractRequisition(textContent);
       log.debug(`****** Purchase Order ID: ${purchaseOrderId} ******`);
     }
-  } else if (screen.raw.includes("was released")) {
+  } else if (screen.raw.includes('was released')) {
     const textContent = await page
       .getByText(/Pick wave \d+ was released/)
       .textContent();
@@ -152,7 +158,7 @@ async function getTextContent(screen: Action, page: Page) {
       );
       log.debug(`****** Pick wave ID1: ${pickWaveId1} ******`);
     }
-  } else if (screen.raw.includes("Sales order")) {
+  } else if (screen.raw.includes('Sales order')) {
     const salesOrderIDMsg = await page
       .getByText(/Sales order \d+ was/)
       .textContent();
@@ -160,7 +166,7 @@ async function getTextContent(screen: Action, page: Page) {
       salesOrderId = await extractRequisition(salesOrderIDMsg);
       log.debug(`****** Sales Order ID: ${salesOrderId} ******`);
     }
-  } else if (screen.raw.includes("The shipment")) {
+  } else if (screen.raw.includes('The shipment')) {
     const shippmentMsg = await page
       .getByText(/The shipment \d+ was confirmed./)
       .textContent();
@@ -168,7 +174,7 @@ async function getTextContent(screen: Action, page: Page) {
       shipmentId = await extractRequisition(shippmentMsg);
       log.debug(`****** The shipment ID: ${shipmentId} ******`);
     }
-  } else if (screen.raw.includes("Process")) {
+  } else if (screen.raw.includes('Process')) {
     const processIdMsg = await page
       .getByText(/Process \d+ was submitted./)
       .textContent();
@@ -176,10 +182,10 @@ async function getTextContent(screen: Action, page: Page) {
       processId = await extractRequisition(processIdMsg);
       log.debug(`The process ID: ${processId}`);
     }
-  } else if (screen.raw.includes("Shipped")) {
-    const orderStatus = await page.getByText("Shipped").textContent();
+  } else if (screen.raw.includes('Shipped')) {
+    const orderStatus = await page.getByText('Shipped').textContent();
     if (orderStatus) {
-      expect(orderStatus).toEqual("Shipped");
+      expect(orderStatus).toEqual('Shipped');
       extractedValue = orderStatus;
       log.debug(`Order Status: ${extractedValue}`);
     }
@@ -193,11 +199,11 @@ async function getTextContent(screen: Action, page: Page) {
  * @param screen
  */
 async function selectDropdownValue(screen: Action, page: Page) {
-  const baseLocator = screen.raw.split(".selectOption")[0];
+  const baseLocator = screen.raw.split('.selectOption')[0];
   await highlightElement(page, baseLocator);
-  const value = screen.value?.replace(/^'(.*)'$/, "$1");
+  const value = screen.value?.replace(/^'(.*)'$/, '$1');
   if (!value) {
-    throw new Error("Value is required for selectDropdownValue");
+    throw new Error('Value is required for selectDropdownValue');
   }
   await eval(`(async () => { await page.${baseLocator}.click(); })()`);
 
@@ -228,19 +234,19 @@ async function setComboBoxValue(
   );
 
   if ((await page.locator("//ul[@role='listbox']//li").count()) > 0) {
-    log.info("Listbox is visible. Selecting the respective value...");
+    log.info('Listbox is visible. Selecting the respective value...');
     const firstItemText = await page
       .locator("//ul[@role='listbox']//li")
       .nth(0)
       .textContent();
-    if (firstItemText === "No results found.") {
+    if (firstItemText === 'No results found.') {
       throw new Error(
-        "No results found in the listbox. Please check the value."
+        'No results found in the listbox. Please check the value.'
       );
     }
     await page.waitForTimeout(500);
   } else {
-    log.warn("Listbox did not appear within the timeout. Filling the input...");
+    log.warn('Listbox did not appear within the timeout. Filling the input...');
     await eval(
       `(async () => { await page.${baseLocator}.press('Shift+Home'); })()`
     );
@@ -258,22 +264,22 @@ async function setComboBoxValue(
  * @param screen
  */
 async function setTextInInputBox(screen: Action, page: Page) {
-  const baseLocator = screen.raw.split(".fill")[0];
-  let value = screen.value?.replace(/^'(.*)'$/, "$1");
+  const baseLocator = screen.raw.split('.fill')[0];
+  let value = screen.value?.replace(/^'(.*)'$/, '$1');
 
   await highlightElement(page, baseLocator);
 
   await eval(`(async () => { await page.${baseLocator}.fill('${value}'); })()`);
 
-  if (screen.raw.includes("combobox")) {
+  if (screen.raw.includes('combobox')) {
     switch (true) {
-      case screen.raw.includes("Manage Shipment Interface"):
+      case screen.raw.includes('Manage Shipment Interface'):
         await eval(`(async () => { await page.${baseLocator}.click(''); })()`);
         await page.waitForTimeout(3000);
         break;
 
-      case screen.raw.includes("From Shipment") ||
-        screen.raw.includes("To Shipment"):
+      case screen.raw.includes('From Shipment') ||
+        screen.raw.includes('To Shipment'):
         if (shipmentId === undefined || shipmentId === null) {
           await eval(
             `(async () => { await page.${baseLocator}.fill('${value}'); })()`
@@ -286,7 +292,7 @@ async function setTextInInputBox(screen: Action, page: Page) {
 
         break;
 
-      case screen.raw.includes("Requisition"):
+      case screen.raw.includes('Requisition'):
         if (requisitionId === undefined || requisitionId === null) {
           await eval(
             `(async () => { await page.${baseLocator}.fill('${value}'); })()`
@@ -318,7 +324,7 @@ async function setTextInInputBox(screen: Action, page: Page) {
             .locator("//div[text()='Search and Select: Order']")
             .isVisible()
         ) {
-          throw new Error("Please enter valid Order id to proceed.");
+          throw new Error('Please enter valid Order id to proceed.');
         }
         break;
 
@@ -328,29 +334,26 @@ async function setTextInInputBox(screen: Action, page: Page) {
         break;
     }
   } else {
-    if (screen.raw.includes("Order")) {
+    if (screen.raw.includes('Order')) {
       if (salesOrderId === undefined || salesOrderId === null) {
-          await eval(
-            `(async () => { await page.${baseLocator}.fill('${value}'); })()`
-          );
-        } else {
-          await eval(
-            `(async () => { await page.${baseLocator}.fill('${salesOrderId}'); })()`
-          );
-        }
         await eval(
-          `(async () => { await page.${baseLocator}.press('Tab'); })()`
+          `(async () => { await page.${baseLocator}.fill('${value}'); })()`
         );
-        await page.waitForTimeout(2000);
-        if (
-          await page
-            .locator("//div[text()='Search and Select: Order']")
-            .isVisible()
-        ) {
-          throw new Error("Please enter valid Order id to proceed.");
-        }
-
-    } else if (screen.raw.includes("Process ID")) {
+      } else {
+        await eval(
+          `(async () => { await page.${baseLocator}.fill('${salesOrderId}'); })()`
+        );
+      }
+      await eval(`(async () => { await page.${baseLocator}.press('Tab'); })()`);
+      await page.waitForTimeout(2000);
+      if (
+        await page
+          .locator("//div[text()='Search and Select: Order']")
+          .isVisible()
+      ) {
+        throw new Error('Please enter valid Order id to proceed.');
+      }
+    } else if (screen.raw.includes('Process ID')) {
       if (processId === undefined || processId === null) {
         await eval(
           `(async () => { await page.${baseLocator}.fill('${value}'); })()`
@@ -387,14 +390,14 @@ async function dynamicAssertionHandler(
   }
 
   const locator = locatorMatch[0];
-  const condition = conditionMatch[0].replace(".", "");
+  const condition = conditionMatch[0].replace('.', '');
   const expectedResult = valueMatch?.[1];
 
   console.log({ locator, condition, expectedResult });
 
   try {
     const element = await page.locator(locator);
-    
+
     switch (condition) {
       case 'toContainText':
         if (expectedResult) {
@@ -443,16 +446,16 @@ async function handleDynamicAssertion(
   expectedValue: string
 ): Promise<void> {
   switch (assertionType) {
-    case "toContainText":
+    case 'toContainText':
       await expect(element).toContainText(expectedValue);
       break;
-    case "toHaveValue":
+    case 'toHaveValue':
       await expect(element).toHaveValue(expectedValue);
       break;
-    case "includes":
+    case 'includes':
       const actualValue = await element.textContent();
       if (!actualValue) {
-        throw new Error("Element has no text content");
+        throw new Error('Element has no text content');
       }
       if (!actualValue.includes(expectedValue)) {
         throw new Error(
@@ -477,36 +480,36 @@ async function waitUntilOrderStatusChange(page: Page, element: Locator) {
 
   while (attemptCount < maxAttempts) {
     const awaitingShippingVisible = await page
-      .getByRole("cell", { name: "Awaiting Shipping", exact: true })
+      .getByRole('cell', { name: 'Awaiting Shipping', exact: true })
       .isVisible();
     const shippedVisible = await page
-      .getByRole("cell", { name: "Closed", exact: true })
+      .getByRole('cell', { name: 'Closed', exact: true })
       .isVisible();
 
     const awaitingBillingingVisible = await page
-      .getByRole("cell", { name: "Awaiting Billing", exact: true })
+      .getByRole('cell', { name: 'Awaiting Billing', exact: true })
       .isVisible();
 
     if (!initialStatusChecked && awaitingShippingVisible) {
-      log.info("Awaiting Shipping is visible. Clicking...");
+      log.info('Awaiting Shipping is visible. Clicking...');
       await page
-        .getByRole("cell", { name: "Awaiting Shipping", exact: true })
+        .getByRole('cell', { name: 'Awaiting Shipping', exact: true })
         .click();
       initialStatusChecked = true;
       break;
     }
 
     if (awaitingBillingingVisible) {
-      log.info("Awaiting Billinging is visible. Clicking...");
+      log.info('Awaiting Billinging is visible. Clicking...');
       await page
-        .getByRole("cell", { name: "Awaiting Billing", exact: true })
+        .getByRole('cell', { name: 'Awaiting Billing', exact: true })
         .click();
       break;
     }
 
     if (shippedVisible) {
-      log.info("Shipped is visible. Clicking...");
-      await page.getByRole("cell", { name: "Shipped", exact: true }).click();
+      log.info('Shipped is visible. Clicking...');
+      await page.getByRole('cell', { name: 'Shipped', exact: true }).click();
       break;
     }
 
@@ -522,8 +525,8 @@ async function waitUntilOrderStatusChange(page: Page, element: Locator) {
   }
 
   if (attemptCount >= maxAttempts) {
-    log.error("Max attempts reached! Exiting loop.");
-    throw new Error("Order status did not change within the expected time.");
+    log.error('Max attempts reached! Exiting loop.');
+    throw new Error('Order status did not change within the expected time.');
   } else {
     log.info("Order status changed to 'Awaiting Shipping' or 'Shipped'.");
   }
@@ -543,34 +546,34 @@ async function selectTabByPageIndex(
 ) {
   // Define a mapping of text to nav-page-index
   const textNavPageMap = new Map<string, number>([
-    ["Redwood Sales", 0],
-    ["Service", 0],
-    ["Me", 0],
-    ["Procurement", 0],
-    ["Help Desk", 0],
-    ["Product Management", 0],
-    ["Benefits Administration", 1],
-    ["Subscription Management", 1],
-    ["Contract Management", 1],
-    ["Order Management", 2],
-    ["Supply Chain Execution", 2],
-    ["Receivables", 2],
-    ["Collections", 2],
-    ["Supply Chain Planning", 3],
-    ["Supplier Portal", 3],
-    ["Payables", 3],
-    ["General Accounting", 3],
-    ["Intercompany Accounting", 4],
-    ["Academics", 4],
-    ["Academic Tools", 4],
-    ["Permitting and Licensing", 4],
-    ["Sustainability", 5],
-    ["My Enterprise", 5],
-    ["Tools", 5],
-    ["Configuration", 5],
-    ["PLM Administration", 5],
-    ["PLM Custom Objects", 6],
-    ["Others", 6],
+    ['Redwood Sales', 0],
+    ['Service', 0],
+    ['Me', 0],
+    ['Procurement', 0],
+    ['Help Desk', 0],
+    ['Product Management', 0],
+    ['Benefits Administration', 1],
+    ['Subscription Management', 1],
+    ['Contract Management', 1],
+    ['Order Management', 2],
+    ['Supply Chain Execution', 2],
+    ['Receivables', 2],
+    ['Collections', 2],
+    ['Supply Chain Planning', 3],
+    ['Supplier Portal', 3],
+    ['Payables', 3],
+    ['General Accounting', 3],
+    ['Intercompany Accounting', 4],
+    ['Academics', 4],
+    ['Academic Tools', 4],
+    ['Permitting and Licensing', 4],
+    ['Sustainability', 5],
+    ['My Enterprise', 5],
+    ['Tools', 5],
+    ['Configuration', 5],
+    ['PLM Administration', 5],
+    ['PLM Custom Objects', 6],
+    ['Others', 6],
   ]);
 
   // Get the assigned `nav-page-index` for the target text
@@ -583,13 +586,13 @@ async function selectTabByPageIndex(
 
   while (true) {
     const currentNavPageIndex = await page.getAttribute(
-      "#navmenu-container",
-      "nav-page-index"
+      '#navmenu-container',
+      'nav-page-index'
     );
     log.info(`Current Nav Page Index: ${currentNavPageIndex}`);
 
     if (!currentNavPageIndex) {
-      log.info("Unable to retrieve current nav-page-index. Exiting...");
+      log.info('Unable to retrieve current nav-page-index. Exiting...');
       return;
     }
 
@@ -608,11 +611,17 @@ async function selectTabByPageIndex(
     // Navigate left or right based on index comparison
     if (targetNavPageIndex < currentIndex) {
       log.info(`Navigating right to find "${targetText}"...`);
-      await highlightElement(page, "locator(\"//div[@id='clusters-left-nav']\")");
+      await highlightElement(
+        page,
+        'locator("//div[@id=\'clusters-left-nav\']")'
+      );
       await page.locator("//div[@id='clusters-left-nav']").click();
     } else {
       log.info(`Navigating left to find "${targetText}"...`);
-      await highlightElement(page, "locator(\"//div[@id='clusters-right-nav']\")");
+      await highlightElement(
+        page,
+        'locator("//div[@id=\'clusters-right-nav\']")'
+      );
       await page.locator("//div[@id='clusters-right-nav']").click();
     }
 
@@ -651,7 +660,7 @@ export async function performActions(
       value,
     ] = match;
     const locatorOptions = options1 ? JSON.parse(options1) : {};
-    
+
     // Type-safe method access
     const pageMethod = method1 as keyof typeof page;
     let element = await (page[pageMethod] as Function)(param1, locatorOptions);
@@ -665,8 +674,8 @@ export async function performActions(
     }
 
     switch (screen.action) {
-      case "click":
-        if (screen.raw.includes("Refresh")) {
+      case 'click':
+        if (screen.raw.includes('Refresh')) {
           await waitUntilOrderStatusChange(page, element.nth(0));
         } else if (
           /getByRole\('link',\s*\{\s*"name":\s*"\d+"\s*\}\)\.click\(\)/.test(
@@ -674,29 +683,32 @@ export async function performActions(
           )
         ) {
           const customXpath = '//table[@summary="Search Results"]//a';
-          const textContent = await page.locator(customXpath).nth(0).textContent();
+          const textContent = await page
+            .locator(customXpath)
+            .nth(0)
+            .textContent();
           if (textContent) {
             pickWaveId = textContent;
             log.debug(`Pick Wave ID: ${pickWaveId}`);
             await page.locator(customXpath).nth(0).click();
           }
-        } else if (screen.raw.includes("Interfaces shipping details")) {
+        } else if (screen.raw.includes('Interfaces shipping details')) {
           await page.waitForTimeout(8000);
           await element.nth(0).click();
-        } else if (screen.raw.includes("getByText")) {
-          if (screen.raw.includes("Requisition")) {
+        } else if (screen.raw.includes('getByText')) {
+          if (screen.raw.includes('Requisition')) {
             const textContent = await element.nth(0).textContent();
             if (textContent) {
               requisitionId = await extractRequisition(textContent);
               log.debug(`Requisition ID: ${requisitionId}`);
             }
-          } else if (screen.raw.includes("Purchase Orders")) {
+          } else if (screen.raw.includes('Purchase Orders')) {
             const textContent = await element.nth(0).textContent();
             if (textContent) {
               purchaseOrderId = await extractRequisition(textContent);
               log.debug(`****** Purchase Order ID: ${purchaseOrderId} ******`);
             }
-          } else if (screen.raw.includes("was released")) {
+          } else if (screen.raw.includes('was released')) {
             const textContent = await page
               .getByText(/Pick wave \d+ was released/)
               .textContent();
@@ -707,7 +719,7 @@ export async function performActions(
               );
               log.debug(`****** Pick wave ID1: ${pickWaveId1} ******`);
             }
-          } else if (screen.raw.includes("Sales order")) {
+          } else if (screen.raw.includes('Sales order')) {
             const salesOrderIDMsg = await page
               .getByText(/Sales order \d+ was/)
               .textContent();
@@ -715,7 +727,7 @@ export async function performActions(
               salesOrderId = await extractRequisition(salesOrderIDMsg);
               log.debug(`****** Sales Order ID: ${salesOrderId} ******`);
             }
-          } else if (screen.raw.includes("The shipment")) {
+          } else if (screen.raw.includes('The shipment')) {
             const shippmentMsg = await page
               .getByText(/The shipment \d+ was confirmed./)
               .textContent();
@@ -723,7 +735,7 @@ export async function performActions(
               shipmentId = await extractRequisition(shippmentMsg);
               log.debug(`****** The shipment ID: ${shipmentId} ******`);
             }
-          } else if (screen.raw.includes("Process")) {
+          } else if (screen.raw.includes('Process')) {
             const processIdMsg = await page
               .getByText(/Process \d+ was submitted./)
               .textContent();
@@ -731,19 +743,19 @@ export async function performActions(
               processId = await extractRequisition(processIdMsg);
               log.debug(`The process ID: ${processId}`);
             }
-          } else if (screen.raw.includes("Shipped")) {
-            const orderStatus = await page.getByText("Shipped").textContent();
+          } else if (screen.raw.includes('Shipped')) {
+            const orderStatus = await page.getByText('Shipped').textContent();
             if (orderStatus) {
-              expect(orderStatus).toEqual("Shipped");
+              expect(orderStatus).toEqual('Shipped');
               log.debug(`Order Status: ${orderStatus}`);
             }
           } else {
             await element.nth(0).click();
             await page.waitForTimeout(1000);
           }
-        } else if (screen.raw.includes("Order Management")) {
+        } else if (screen.raw.includes('Order Management')) {
           log.info(`Clicking on element: ${await element.nth(0).isVisible()}`);
-          await selectTabByPageIndex(page, "Order Management", screen);
+          await selectTabByPageIndex(page, 'Order Management', screen);
         } else {
           await page.waitForTimeout(1000);
           await element.nth(0).hover();
@@ -751,50 +763,50 @@ export async function performActions(
           await page.waitForTimeout(1000);
         }
         break;
-      case "press":
-        const sanitizedValue = screen.parsedValue?.replace(/^'(.*)'$/, "$1");
+      case 'press':
+        const sanitizedValue = screen.parsedValue?.replace(/^'(.*)'$/, '$1');
         await element.nth(0).press(sanitizedValue);
         await page.waitForTimeout(1000);
         break;
 
-      case "fill":
-        const fillValue = screen.value?.replace(/^'(.*)'$/, "$1");
+      case 'fill':
+        const fillValue = screen.value?.replace(/^'(.*)'$/, '$1');
         await element.nth(0).fill(fillValue);
         if (
-          screen.raw.includes("From Shipment") ||
-          screen.raw.includes("To Shipment")
+          screen.raw.includes('From Shipment') ||
+          screen.raw.includes('To Shipment')
         ) {
           element.nth(0).fill(shipmentId);
         }
 
-        if (screen.raw.includes("combobox")) {
+        if (screen.raw.includes('combobox')) {
           await executeCopyPaste(element.nth(0), page);
         }
 
-        if (screen.raw.includes("Manage Shipment Interface")) {
+        if (screen.raw.includes('Manage Shipment Interface')) {
           await element.nth(0).click();
           await page.waitForTimeout(3000);
         }
 
-        if (screen.raw.includes("Requisition")) {
+        if (screen.raw.includes('Requisition')) {
           await element.nth(0).fill(requisitionId);
         }
 
-        if (screen.raw.includes("Order")) {
+        if (screen.raw.includes('Order')) {
           await element.nth(0).fill(`${salesOrderId}`);
-          await element.nth(0).press("Tab");
+          await element.nth(0).press('Tab');
           await page.waitForTimeout(2000);
         }
         break;
 
-      case "selectOption":
-        const selectValue = screen.value?.replace(/^'(.*)'$/, "$1");
+      case 'selectOption':
+        const selectValue = screen.value?.replace(/^'(.*)'$/, '$1');
         await element.nth(0).click();
         await element.nth(0).selectOption(selectValue);
         await page.waitForTimeout(2000);
         break;
 
-      case "expect":
+      case 'expect':
         if (screen.assertionType && screen.parsedValue) {
           await handleDynamicAssertion(
             element.nth(0),
@@ -813,17 +825,17 @@ export async function performActions(
 export async function screenshot(page: Page, screen: string, num?: number) {
   const screenshotBuffer = await page.screenshot();
   test.info().attach(`Screenshot# ${num}: ${screen}`, {
-    contentType: "image/png",
+    contentType: 'image/png',
     body: screenshotBuffer,
   });
 }
 
-
 async function highlightElement(page: Page, selector: any) {
-  const locator: Locator = (new Function('page', `return page.${selector}`))(page);
+  const locator: Locator = new Function('page', `return page.${selector}`)(
+    page
+  );
   await locator.evaluate((el) => {
     el.style.border = '3px solid red';
     el.style.transition = 'border 0.3s ease';
   });
 }
-
