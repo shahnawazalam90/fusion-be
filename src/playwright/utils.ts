@@ -174,7 +174,7 @@ export async function captureVideo(page: Page, scenario: string, testInfo: any) 
     )}_${Date.now()}.webm`;
     console.log(`Video path: ${videoPath}`)
     await video.saveAs(videoPath);
-    await testInfo.attach(`${videoPath}`, {
+    await testInfo.attach(`${scenario}`, {
       path: videoPath,
       contentType: "video/webm",
     });
