@@ -63,13 +63,7 @@ testData.forEach(
 
       test(`${data.scenario} test case - ${index}`, async ({}, testInfo) => {
         await test.step(`Navigate to URL: ${data.url}`, async () => {
-          if (process.env.BASE_URL?.includes('localhost')) {
-            log.info(`URL: ${data.url}`);
-            await page.goto(data.url);
-          } else {
-            log.info(`URL: ${process.env.BASE_URL}`);
-            await page.goto(process.env.BASE_URL ?? 'about:blank');
-          }
+          await page.goto(data.url);
         });
 
         let count = 0;
