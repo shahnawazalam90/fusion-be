@@ -266,10 +266,12 @@ class ReportService {
             }
           }
 
+          // Always update filepath if folder exists
+          await this.updateReportFilePath(report.id, folderName);
+          
           // Only update status if it has changed
           if (newStatus !== report.status) {
             await this.updateReportStatus(report.id, newStatus);
-            await this.updateReportFilePath(report.id, folderName);
           }
         }
       }
