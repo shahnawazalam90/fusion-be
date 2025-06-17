@@ -249,8 +249,13 @@ class ReportService {
           let newStatus = report.status;
 
           if (process) {
-            // If process exists, use its status
-            newStatus = process.exitCode === 0 ? 'completed' : 'failed';
+            // If process exists and is running, keep it as pending
+            if (process.isRunning) {
+              newStatus = 'pending';
+            } else {
+              // Only update status if process has completed
+              newStatus = process.exitCode === 0 ? 'completed' : 'failed';
+            }
           } else if (report.status === 'pending') {
             // If no process exists but folder exists, check for test results
             const testResultsPath = path.join(reportFolderPath, 'test-results');
@@ -261,9 +266,11 @@ class ReportService {
             }
           }
 
-          // Update report status and filepath
-          await this.updateReportStatus(report.id, newStatus);
-          await this.updateReportFilePath(report.id, folderName);
+          // Only update status if it has changed
+          if (newStatus !== report.status) {
+            await this.updateReportStatus(report.id, newStatus);
+            await this.updateReportFilePath(report.id, folderName);
+          }
         }
       }
     }

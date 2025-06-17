@@ -8,6 +8,13 @@ import { captureVideo, log } from './utils';
 // Configure global timeout
 test.setTimeout(300000); // 5 minutes global timeout
 
+// Add cleanup after all tests
+test.afterAll(async () => {
+  if (page) {
+    await page.close();
+  }
+});
+
 const dataFileName = process.env.DATAFILE || '';
 const filePath = path.resolve(
   __dirname,
@@ -58,17 +65,24 @@ testData.forEach(
       let page: Page;
 
       test.beforeAll(async () => {
-        page = await setupBrowser();
+        try {
+          page = await setupBrowser();
+          // Set a reasonable timeout for the beforeAll hook
+          test.setTimeout(60000); // 1 minute timeout for setup
+        } catch (error) {
+          console.error('Failed to setup browser:', error);
+          throw error;
+        }
       });
 
       test(`${data.scenario} test case - ${index}`, async ({}, testInfo) => {
-        await test.step(`Navigate to URL: ${data.url}`, async () => {
-          await page.goto(data.url);
-        });
-
-        let count = 0;
-        let num = 1;
         try {
+          await test.step(`Navigate to URL: ${data.url}`, async () => {
+            await page.goto(data.url, { timeout: 30000 });
+          });
+
+          let count = 0;
+          let num = 1;
           for (const screen of data.screens) {
             await test.step(`Execution started : ${screen.screenName} `, async () => {
               for (const screenAction of screen.actions) {
