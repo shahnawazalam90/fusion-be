@@ -6,7 +6,7 @@ import { page, setupBrowser } from './browser';
 import { captureVideo, log } from './utils';
 
 // Configure global timeout
-test.setTimeout(300000); // 5 minutes global timeout
+// test.setTimeout(300000); // 5 minutes global timeout
 
 // Add cleanup after all tests
 test.afterAll(async () => {
@@ -68,7 +68,7 @@ testData.forEach(
         try {
           page = await setupBrowser();
           // Set a reasonable timeout for the beforeAll hook
-          test.setTimeout(60000); // 1 minute timeout for setup
+          // test.setTimeout(60000); // 1 minute timeout for setup
         } catch (error) {
           console.error('Failed to setup browser:', error);
           throw error;
