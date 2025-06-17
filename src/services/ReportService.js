@@ -309,7 +309,10 @@ class ReportService {
       const scenarios = await Promise.all(
         scenarioIds.map((id) => this.scenarioRepository.findById(id))
       );
-      const scenarioNames = scenarios.map((scenario) => scenario.name).join(', ');
+      const scenarioNames = scenarios
+        .filter(scenario => scenario !== null) // Filter out null scenarios
+        .map((scenario) => scenario.name)
+        .join(', ');
 
       // Send email
       const emailBody = `The report you've executed for ${scenarioNames} is complete.`;
