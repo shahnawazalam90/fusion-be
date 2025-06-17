@@ -28,93 +28,123 @@ export const setupBrowser = async (): Promise<Page> => {
   let device: any;
   const headless = process.env.HEADLESS === "true";
   const isLocal = headless === true;
+  let retryCount = 0;
+  const maxRetries = 3;
 
-  try {
-    switch (browserName.toLowerCase()) {
-      case "firefox":
-        browser = await firefox.launch({
-          channel: "firefox",
-          headless: headless,
-          timeout: 30000,
-        });
-        device = devices["Desktop Firefox"];
-        break;
-      case "safari":
-        browser = await webkit.launch({
-          timeout: 30000,
-        });
-        break;
-      case "webkit":
-        browser = await webkit.launch({
-          timeout: 30000,
-        });
-        break;
-      case "edge":
-        browser = await chromium.launch({
-          channel: "msedge",
-          headless: headless,
-          timeout: 30000,
-          args: [
-            "--disable-features=InPrivateMode",
-            "--start-maximized",
-            "--deny-permission-prompts",
-            "--disable-infobars",
-          ],
-        });
-        break;
-      case "chrome":
-        browser = await chromium.launch({
-          channel: "chrome",
-          headless: headless,
-          timeout: 30000,
-          args: [
-            "--start-maximized",
-            "--disable-dev-shm-usage",
-            "--no-sandbox",
-          ],
-        });
-        break;
-      case "chromium":
-      default:
-        browser = await chromium.launch({
-          args: [
-            "--start-maximized",
-            "--disable-dev-shm-usage",
-            "--no-sandbox",
-          ],
-          headless: headless,
-          timeout: 30000,
-        });
-        break;
-    }
-
-    if (!browser) {
-      throw new Error(`Browser ${browserName} could not be launched.`);
-    }
-
-    context = await browser.newContext({
-      viewport: { width: 1366, height: 768 },
-      acceptDownloads: true,
-      deviceScaleFactor: 1,
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
-      recordVideo: {
-        dir: './uploads/reports/' + reportFolder.replace(/\.[^/.]+$/, '') + '/videos',
-        size: { width: 1280, height: 720 }
+  while (retryCount < maxRetries) {
+    try {
+      switch (browserName.toLowerCase()) {
+        case "firefox":
+          browser = await firefox.launch({
+            channel: "firefox",
+            headless: headless,
+            timeout: 30000,
+          });
+          device = devices["Desktop Firefox"];
+          break;
+        case "safari":
+          browser = await webkit.launch({
+            timeout: 30000,
+          });
+          break;
+        case "webkit":
+          browser = await webkit.launch({
+            timeout: 30000,
+          });
+          break;
+        case "edge":
+          browser = await chromium.launch({
+            channel: "msedge",
+            headless: headless,
+            timeout: 30000,
+            args: [
+              "--disable-features=InPrivateMode",
+              "--start-maximized",
+              "--deny-permission-prompts",
+              "--disable-infobars",
+            ],
+          });
+          break;
+        case "chrome":
+          browser = await chromium.launch({
+            channel: "chrome",
+            headless: headless,
+            timeout: 30000,
+            args: [
+              "--start-maximized",
+              "--disable-dev-shm-usage",
+              "--no-sandbox",
+              "--disable-setuid-sandbox",
+              "--disable-gpu",
+              "--disable-software-rasterizer",
+            ],
+          });
+          break;
+        case "chromium":
+        default:
+          browser = await chromium.launch({
+            args: [
+              "--start-maximized",
+              "--disable-dev-shm-usage",
+              "--no-sandbox",
+              "--disable-setuid-sandbox",
+              "--disable-gpu",
+              "--disable-software-rasterizer",
+            ],
+            headless: headless,
+            timeout: 30000,
+          });
+          break;
       }
-    });
 
-    const page = await context.newPage();
-    await page.setDefaultTimeout(30000);
-    await page.setDefaultNavigationTimeout(30000);
+      if (!browser) {
+        throw new Error(`Browser ${browserName} could not be launched.`);
+      }
 
-    log.info("Browser is maximized");
-    return page;
-  } catch (error) {
-    log.error(`Failed to setup browser: ${error.message}`);
-    if (browser) {
-      await browser.close();
+      context = await browser.newContext({
+        viewport: { width: 1366, height: 768 },
+        acceptDownloads: true,
+        deviceScaleFactor: 1,
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+        recordVideo: {
+          dir: './uploads/reports/' + reportFolder.replace(/\.[^/.]+$/, '') + '/videos',
+          size: { width: 1280, height: 720 }
+        }
+      });
+
+      const page = await context.newPage();
+      await page.setDefaultTimeout(30000);
+      await page.setDefaultNavigationTimeout(30000);
+
+      log.info("Browser is maximized");
+      return page;
+    } catch (error) {
+      retryCount++;
+      log.error(`Failed to setup browser (attempt ${retryCount}/${maxRetries}): ${error.message}`);
+      
+      if (context) {
+        try {
+          await context.close();
+        } catch (e) {
+          log.error('Error closing context:', e);
+        }
+        context = null;
+      }
+      if (browser) {
+        try {
+          await browser.close();
+        } catch (e) {
+          log.error('Error closing browser:', e);
+        }
+        browser = null;
+      }
+
+      if (retryCount === maxRetries) {
+        throw new Error(`Failed to setup browser after ${maxRetries} attempts: ${error.message}`);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
     }
-    throw error;
   }
 };
 

@@ -68,7 +68,7 @@ testData.forEach(
         try {
           page = await setupBrowser();
           // Set a reasonable timeout for the beforeAll hook
-          // test.setTimeout(60000); // 1 minute timeout for setup
+          test.setTimeout(60000); // 1 minute timeout for setup
         } catch (error) {
           console.error('Failed to setup browser:', error);
           throw error;
@@ -103,7 +103,19 @@ testData.forEach(
           }
           await captureVideo(page, data.scenario, testInfo);
         } catch (error) {
+          console.error('Test execution failed:', error);
           await captureVideo(page, data.scenario, testInfo);
+          throw error; // Re-throw the error to mark the test as failed
+        }
+      });
+
+      test.afterAll(async () => {
+        if (page) {
+          try {
+            await page.close();
+          } catch (error) {
+            console.error('Error closing page:', error);
+          }
         }
       });
     });

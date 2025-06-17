@@ -50,6 +50,9 @@ class ReportService {
 
   async executePlaywrightTest(reportId, dataFile, browser) {
     try {
+      // Set initial status to running
+      await this.updateReportStatus(reportId, 'running');
+
       const processInfo = await playwrightManager.executeTest({
         reportId,
         dataFile,
@@ -62,6 +65,7 @@ class ReportService {
       return processInfo;
     } catch (error) {
       console.error('Error executing Playwright test:', error);
+      // Ensure status is set to failed on any error
       await this.updateReportStatus(reportId, 'failed');
       throw error;
     }
@@ -263,6 +267,9 @@ class ReportService {
               // Check if there are any failed tests in the results
               const hasFailedTests = await this.checkForFailedTests(testResultsPath);
               newStatus = hasFailedTests ? 'failed' : 'completed';
+            } else {
+              // If no test results exist but process is gone, mark as failed
+              newStatus = 'failed';
             }
           }
 

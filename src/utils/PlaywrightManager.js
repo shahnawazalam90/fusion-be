@@ -133,6 +133,13 @@ class PlaywrightManager {
           const output = data.toString();
           console.log(`Playwright stdout: ${output}`);
           this.sendEvent(reportId, 'output', { output });
+          
+          // Check for test failure in output
+          if (output.includes('failed') || output.includes('Error:') || output.includes('Test timeout')) {
+            processManager.updateProcessStatus(reportId, false, 1);
+            this.sendEvent(reportId, 'status', { status: 'failed' });
+            if (onStatusUpdate) onStatusUpdate('failed');
+          }
         });
 
         // Handle stderr
@@ -140,12 +147,17 @@ class PlaywrightManager {
           const error = data.toString();
           console.error(`Playwright stderr: ${error}`);
           this.sendEvent(reportId, 'error', { error });
+          
+          // Update status to failed on any error
+          processManager.updateProcessStatus(reportId, false, 1);
+          this.sendEvent(reportId, 'status', { status: 'failed' });
+          if (onStatusUpdate) onStatusUpdate('failed');
         });
 
         // Handle process errors
         playwrightProcess.on('error', (error) => {
           console.error('Failed to start Playwright process:', error);
-          processManager.updateProcessStatus(reportId, false, -1);
+          processManager.updateProcessStatus(reportId, false, 1);
           this.sendEvent(reportId, 'error', { error: error.message });
           this.sendEvent(reportId, 'status', { status: 'failed' });
           if (onStatusUpdate) onStatusUpdate('failed');
@@ -155,6 +167,12 @@ class PlaywrightManager {
         // Handle test completion
         playwrightProcess.on('close', async (code, signal) => {
           console.log(`Playwright process exited with code ${code} and signal ${signal}`);
+          
+          // If process was killed or crashed, mark as failed
+          if (signal || code === null) {
+            code = 1;
+          }
+          
           processManager.updateProcessStatus(reportId, false, code);
           const status = code === 0 ? 'completed' : 'failed';
           this.sendEvent(reportId, 'status', { status, exitCode: code });
